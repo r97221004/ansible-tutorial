@@ -5,7 +5,7 @@
     state: absent
 
 - name: 執行 kubeadm reset
-  command: kubeadm reset -f
+  command: kubeadm reset -f --cri-socket=unix:///var/run/containerd/containerd.sock
   args:
     removes: /etc/kubernetes/admin.conf
 

@@ -39,6 +39,7 @@
       - kubeadm
       - kubectl
     state: present
+    update_cache: true
 
 - name: 鎖定版本，避免自動升級
   dpkg_selections:

@@ -2,9 +2,10 @@
 - name: 初始化 kubeadm cluster
   shell: >
     kubeadm init
-    --apiserver-advertise-address={{ ansible_host }}
+    --apiserver-advertise-address={{ ansible_default_ipv4.address }}
     --apiserver-cert-extra-sans={{ ansible_host }}
     --pod-network-cidr=10.244.0.0/16
+    --cri-socket=unix:///var/run/containerd/containerd.sock
   args:
     creates: /etc/kubernetes/admin.conf
 
