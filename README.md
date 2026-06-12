@@ -1,4 +1,4 @@
-# Ansible Notes
+# Ansible in Practice
 
 > **Problem**: Manually SSH-ing into multiple machines to install packages, copy configs, and start services is slow, repetitive, and easy to get inconsistent.
 >
@@ -17,6 +17,7 @@
 - [**Variables**](#variables)
 - [**when**](#when)
 - [**loop**](#loop)
+- [**Error Handling**](#error-handling)
 - [**Install k3s**](#install-k3s)
 
 ---
@@ -239,11 +240,11 @@ A few modules that show up in almost every playbook.
 
 ### command vs shell vs script
 
-| Module | Description |
-|-----------|-------------|
+| Module    | Description                                                                                        |
+| --------- | -------------------------------------------------------------------------------------------------- |
 | `command` | runs a command directly, no shell features (no pipes `\|`, `&&`, env vars) — safer, default choice |
-| `shell` | runs through `/bin/sh`, supports pipes/redirects/env vars — use when you need shell features |
-| `script` | uploads and runs a local script on the remote host |
+| `shell`   | runs through `/bin/sh`, supports pipes/redirects/env vars — use when you need shell features       |
+| `script`  | uploads and runs a local script on the remote host                                                 |
 
 ```yaml
 - name: Safe, no shell features needed
@@ -275,7 +276,7 @@ A few modules that show up in almost every playbook.
   file:
     path: /home/{{ ansible_user }}/.kube
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Remove a file
   file:
@@ -288,9 +289,9 @@ A few modules that show up in almost every playbook.
 
 ### copy vs template
 
-| Module | Description |
-|------------|-------------|
-| `copy` | copies a file to the target machine — file **content** is sent as-is |
+| Module     | Description                                                                                   |
+| ---------- | --------------------------------------------------------------------------------------------- |
+| `copy`     | copies a file to the target machine — file **content** is sent as-is                          |
 | `template` | renders a `.j2` Jinja2 file — file **content** has `{{ variables }}` filled in before copying |
 
 `{{ variables }}` can appear in two different places, and only one of them is affected by which module you use:
@@ -304,7 +305,7 @@ A few modules that show up in almost every playbook.
 - name: Copy a static config file into each user's home directory
   copy:
     src: files/app.conf
-    dest: /home/{{ ansible_user }}/app.conf   # task parameter → resolved by Ansible
+    dest: /home/{{ ansible_user }}/app.conf # task parameter → resolved by Ansible
 ```
 
 `src` is a file on the control machine, `dest` is the path on the target machine. If `files/app.conf` itself contained the text `{{ ansible_user }}`, it would be copied over literally as `{{ ansible_user }}` — `copy` never touches file content.
@@ -312,6 +313,7 @@ A few modules that show up in almost every playbook.
 **template — both the path and the file content can be dynamic**
 
 **templates/motd.j2**
+
 ```
 Welcome to {{ ansible_hostname }}
 Your IP is {{ ansible_host }}
@@ -320,7 +322,7 @@ Your IP is {{ ansible_host }}
 ```yaml
 - name: Generate motd from template
   template:
-    src: motd.j2    # on the control machine (deployer), under templates/
+    src: motd.j2 # on the control machine (deployer), under templates/
     dest: /etc/motd # on the target/remote machine
 ```
 
@@ -333,11 +335,11 @@ By default `copy`/`unarchive`/etc. expect `src` to be on the control machine. Ad
 ```yaml
 - name: Copy kubeconfig to the user's home directory
   copy:
-    src: /etc/rancher/k3s/k3s.yaml   # already exists on the target machine
+    src: /etc/rancher/k3s/k3s.yaml # already exists on the target machine
     dest: /home/{{ ansible_user }}/.kube/config
     owner: "{{ ansible_user }}"
-    mode: '0600'
-    remote_src: true   # read src from the target machine, not the control machine
+    mode: "0600"
+    remote_src: true # read src from the target machine, not the control machine
 ```
 
 ### service / systemd — manage services
@@ -417,7 +419,7 @@ Many tasks (installing packages, managing services, writing to system paths) req
 ```yaml
 - name: Install k3s
   hosts: control
-  become: true   # applies to every task in this play
+  become: true # applies to every task in this play
   tasks:
     - name: Download and run install script
       shell: curl -sfL https://get.k3s.io | sh -
@@ -433,7 +435,7 @@ tasks:
 
   - name: Read a root-only file
     command: cat /etc/shadow
-    become: true   # only this task uses sudo
+    become: true # only this task uses sudo
 ```
 
 ### become_user and the ad-hoc equivalent
@@ -446,9 +448,11 @@ tasks:
 `become: true` only works without prompting if the SSH login user has passwordless sudo, or `ansible_become_pass` is configured.
 
 - **Passwordless sudo (recommended)** — set up on the **target machine** itself, independent of Ansible:
+
   ```bash
   echo "matt2_chang ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/matt2_chang
   ```
+
   Cloud VM default users (e.g. on Azure) usually already have this configured — that's why `become: true` works without any password prompt in this project.
 
 - **`ansible_become_pass`** — only needed if sudo still requires a password:
@@ -527,12 +531,12 @@ demo_motd_message: "Welcome to the control node"
 
 The filename must match the group name from the inventory (e.g. `control`) or the host (IP/hostname).
 
-| | matches by | scope |
-|---|---|---|
-| `group_vars/<group>.yml` | inventory **group name** | every host in that group |
-| `host_vars/<host>.yml` | inventory **host name** | only that host, regardless of group |
+|                          | matches by               | scope                               |
+| ------------------------ | ------------------------ | ----------------------------------- |
+| `group_vars/<group>.yml` | inventory **group name** | every host in that group            |
+| `host_vars/<host>.yml`   | inventory **host name**  | only that host, regardless of group |
 
-> Since `group_vars`/`host_vars` are tied to the **inventory**, their variables are loaded for *every* playbook run with that inventory — not just one. Prefix variable names (e.g. `demo_packages`, `demo_motd_message`) to avoid collisions with variables used by other playbooks.
+> Since `group_vars`/`host_vars` are tied to the **inventory**, their variables are loaded for _every_ playbook run with that inventory — not just one. Prefix variable names (e.g. `demo_packages`, `demo_motd_message`) to avoid collisions with variables used by other playbooks.
 
 ### playbooks/demo_variables.yml — putting it together
 
@@ -630,6 +634,56 @@ For example, if `packages` is `[curl, git]` in `group_vars/control.yml`, but the
   - `loop` is for modules whose parameters **don't** accept a list, e.g. `file`, `copy`, `user` — each item runs as its own task
 
 - **`with_items` (old syntax)**: works similarly to `loop`, but is the older form — new playbooks should use `loop`
+
+---
+
+## Error Handling
+
+By default, if a task fails, Ansible stops the play on that host. These directives let you control that behavior.
+
+### ignore_errors
+
+- **`ignore_errors: true`** → lets the task fail without stopping the play; Ansible still reports it as `failed`, but moves on to the next task
+
+```yaml
+- name: Update apt cache (repo may be temporarily broken)
+  apt:
+    update_cache: true
+  ignore_errors: true
+```
+
+### failed_when
+
+- **`failed_when:`** → overrides what counts as "failed". By default `command`/`shell` only fail on a non-zero exit code; `failed_when` lets you fail based on the output instead
+
+```yaml
+- name: Check root disk usage
+  command: df -h /
+  register: disk_usage
+  failed_when: "'100%' in disk_usage.stdout"
+```
+
+- the command itself exits `0` (success), but the task is still marked `failed` if `100%` appears in the output
+
+### block / rescue / always
+
+- **`block:`** groups tasks together; **`rescue:`** runs only if a task in the block fails; **`always:`** always runs — similar to try/catch/finally
+
+```yaml
+tasks:
+  - block:
+      - name: Run risky script
+        command: /usr/local/bin/risky-script.sh
+    rescue:
+      - name: Notify on failure
+        debug:
+          msg: "risky-script.sh failed, continuing anyway"
+    always:
+      - name: Remove lock file
+        file:
+          path: /tmp/risky.lock
+          state: absent
+```
 
 ---
 
