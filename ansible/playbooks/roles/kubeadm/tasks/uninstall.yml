@@ -1,0 +1,47 @@
+---
+- name: 移除 k9s binary
+  file:
+    path: /usr/local/bin/k9s
+    state: absent
+
+- name: 執行 kubeadm reset
+  command: kubeadm reset -f
+  args:
+    removes: /etc/kubernetes/admin.conf
+
+- name: 移除 kubeconfig
+  file:
+    path: /home/{{ ansible_user }}/.kube/config
+    state: absent
+
+- name: 移除 CNI 設定
+  file:
+    path: /etc/cni/net.d
+    state: absent
+
+- name: 解除版本鎖定，允許移除
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: 移除 kubelet kubeadm kubectl
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: absent
+
+- name: 移除 Kubernetes apt repository
+  file:
+    path: /etc/apt/sources.list.d/kubernetes.list
+    state: absent
+
+- name: 移除 Kubernetes apt key
+  file:
+    path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    state: absent

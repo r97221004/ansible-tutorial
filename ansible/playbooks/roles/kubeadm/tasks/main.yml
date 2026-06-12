@@ -1,0 +1,6 @@
+---
+- include_tasks: install.yml
+  when: kubeadm_state == "present"
+
+- include_tasks: uninstall.yml
+  when: kubeadm_state == "absent"

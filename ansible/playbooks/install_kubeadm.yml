@@ -1,0 +1,6 @@
+---
+- name: 安裝 kubeadm cluster
+  hosts: control
+  become: true
+  roles:
+    - kubeadm

@@ -1,0 +1,29 @@
+---
+- name: 安裝 containerd
+  apt:
+    name: containerd
+    state: present
+
+- name: 建立 containerd 設定目錄
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+
+- name: 產生 containerd 預設設定
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+
+- name: 設定 containerd 使用 systemd cgroup
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    line: '            SystemdCgroup = true'
+  notify: restart containerd
+
+- name: 啟動 containerd 服務
+  systemd:
+    name: containerd
+    state: started
+    enabled: true

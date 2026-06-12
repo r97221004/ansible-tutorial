@@ -1,0 +1,38 @@
+---
+- name: 初始化 kubeadm cluster
+  shell: >
+    kubeadm init
+    --apiserver-advertise-address={{ ansible_host }}
+    --apiserver-cert-extra-sans={{ ansible_host }}
+    --pod-network-cidr=10.244.0.0/16
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: 等待 etcd 就緒
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 2379
+    delay: 10
+    timeout: 120
+
+- name: 等待 API server 就緒
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 6443
+    delay: 30
+    timeout: 180
+
+- name: 建立 .kube 目錄
+  file:
+    path: /home/{{ ansible_user }}/.kube
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: 複製 kubeconfig
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/{{ ansible_user }}/.kube/config
+    owner: "{{ ansible_user }}"
+    mode: '0600'
+    remote_src: true

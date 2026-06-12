@@ -1,0 +1,7 @@
+---
+- name: 解除安裝 kubeadm cluster
+  hosts: control
+  become: true
+  roles:
+    - role: kubeadm
+      kubeadm_state: absent

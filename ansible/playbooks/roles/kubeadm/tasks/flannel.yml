@@ -1,0 +1,17 @@
+---
+- name: 下載 flannel manifest
+  get_url:
+    url: https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+    dest: /tmp/kube-flannel.yml
+    mode: '0644'
+
+- name: 設定 flannel 使用指定網卡
+  lineinfile:
+    path: /tmp/kube-flannel.yml
+    insertafter: '- --kube-subnet-mgr'
+    line: '        - --iface={{ flannel_iface }}'
+
+- name: 部署 flannel
+  command: kubectl apply -f /tmp/kube-flannel.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
