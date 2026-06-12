@@ -18,6 +18,7 @@
 - [**when**](#when)
 - [**loop**](#loop)
 - [**Error Handling**](#error-handling)
+- [**Ansible Vault**](#ansible-vault)
 - [**Install k3s**](#install-k3s)
 
 ---
@@ -46,6 +47,8 @@ Placed in the `ansible/` directory and automatically applied when running `ansib
 inventory = inventory/azure.ini   # default inventory, so the -i flag can be omitted
 host_key_checking = False         # avoids getting stuck on the host key prompt when SSH-ing into a new machine for the first time
 ```
+
+> Ansible only auto-loads `ansible.cfg` if you run `ansible-playbook` from the **same directory it's in** (`ansible/`). From the project root, it's ignored, so add `-i ansible/inventory/azure.ini` explicitly.
 
 ---
 
@@ -512,13 +515,15 @@ ansible/
 └── inventory/
     ├── azure.ini
     ├── group_vars/
-    │   └── control.yml
+    │   └── control/
+    │       ├── vars.yml
+    │       └── vault.yml
     └── host_vars/
         └── 40.81.188.168.yml
 ```
 
 ```yaml
-# inventory/group_vars/control.yml
+# inventory/group_vars/control/vars.yml
 demo_packages:
   - curl
   - git
@@ -529,12 +534,14 @@ demo_packages:
 demo_motd_message: "Welcome to the control node"
 ```
 
-The filename must match the group name from the inventory (e.g. `control`) or the host (IP/hostname).
+The filename (or directory name) must match the group name from the inventory (e.g. `control`) or the host (IP/hostname).
 
 |                          | matches by               | scope                               |
 | ------------------------ | ------------------------ | ----------------------------------- |
-| `group_vars/<group>.yml` | inventory **group name** | every host in that group            |
+| `group_vars/<group>.yml` or `group_vars/<group>/` | inventory **group name** | every host in that group            |
 | `host_vars/<host>.yml`   | inventory **host name**  | only that host, regardless of group |
+
+> `group_vars/<group>/` can be a **directory** instead of a single file — every `.yml` file inside it is loaded and merged. This is the standard way to keep plaintext variables (`vars.yml`) and [Vault-encrypted](#ansible-vault) variables (`vault.yml`) side by side.
 
 > Since `group_vars`/`host_vars` are tied to the **inventory**, their variables are loaded for _every_ playbook run with that inventory — not just one. Prefix variable names (e.g. `demo_packages`, `demo_motd_message`) to avoid collisions with variables used by other playbooks.
 
@@ -555,14 +562,21 @@ The filename must match the group name from the inventory (e.g. `control`) or th
     - name: Show host_vars message
       debug:
         msg: "{{ demo_motd_message }}"
+
+    - name: Confirm ansible_become_pass was loaded from Vault
+      debug:
+        msg: "ansible_become_pass is defined: {{ ansible_become_pass is defined }}"
 ```
 
 ```bash
-ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/demo_variables.yml
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/demo_variables.yml --ask-vault-pass
 ```
 
-- `demo_packages` comes from `inventory/group_vars/control.yml` → installs `curl` and `git`
+- `demo_packages` comes from `inventory/group_vars/control/vars.yml` → installs `curl` and `git`
 - `demo_motd_message` comes from `inventory/host_vars/40.81.188.168.yml` → printed via `debug`
+- `ansible_become_pass` comes from the encrypted `inventory/group_vars/control/vault.yml` → `--ask-vault-pass` decrypts it, so `become: true` tasks no longer prompt for a sudo password
+
+> The `debug` task only checks `is defined`, never prints the value itself — printing a secret would leak it into the playbook output/log.
 
 ### command line `-e` — override at run time
 
@@ -578,7 +592,7 @@ If the same variable is defined in multiple places, Ansible uses the one with th
 
 `group_vars` < `host_vars` < playbook `vars:` < command line `-e`
 
-For example, if `packages` is `[curl, git]` in `group_vars/control.yml`, but the playbook is run with `-e '{"packages": ["curl"]}'`, only `curl` gets installed — the `-e` value wins.
+For example, if `packages` is `[curl, git]` in `group_vars/control/vars.yml`, but the playbook is run with `-e '{"packages": ["curl"]}'`, only `curl` gets installed — the `-e` value wins.
 
 ---
 
@@ -683,6 +697,42 @@ tasks:
         file:
           path: /tmp/risky.lock
           state: absent
+```
+
+---
+
+## Ansible Vault
+
+Encrypts sensitive data (passwords, tokens, private keys) so it can be safely committed to version control.
+
+### Basic commands
+
+| Command                        | Description                                  |
+| ------------------------------- | --------------------------------------------- |
+| `ansible-vault create <file>`  | create a new encrypted file                  |
+| `ansible-vault edit <file>`    | edit an encrypted file in place              |
+| `ansible-vault encrypt <file>` | encrypt an existing plaintext file           |
+| `ansible-vault decrypt <file>` | decrypt back to plaintext                    |
+| `ansible-vault view <file>`    | view contents without decrypting on disk     |
+
+### Example
+
+```bash
+ansible-vault create inventory/group_vars/control/vault.yml
+```
+
+```yaml
+# inventory/group_vars/control/vault.yml (encrypted on disk)
+ansible_become_pass: supersecret
+```
+
+### Running playbooks with Vault
+
+- `--ask-vault-pass` → prompt for the vault password interactively
+- `--vault-password-file <path>` → read the password from a file (the file itself should not be committed)
+
+```bash
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/site.yml --ask-vault-pass
 ```
 
 ---
