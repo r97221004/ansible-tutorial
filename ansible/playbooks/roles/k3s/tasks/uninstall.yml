@@ -1,0 +1,27 @@
+---
+- name: 執行 k3s 解除安裝腳本
+  ansible.builtin.command: /usr/local/bin/k3s-uninstall.sh
+  args:
+    removes: /usr/local/bin/k3s    # binary 不存在就跳過
+
+- name: 清除 k3s 設定與資料目錄
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher
+    - /var/lib/rancher
+
+- name: 移除 kubeconfig
+  ansible.builtin.file:
+    path: "/home/{{ k3s_user }}/.kube/config"
+    state: absent
+
+- name: 確認 k3s binary 已移除
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: 印出解除安裝結果
+  ansible.builtin.debug:
+    msg: "{{ 'k3s 已成功解除安裝' if not k3s_binary.stat.exists else 'k3s 還在，解除安裝失敗' }}"

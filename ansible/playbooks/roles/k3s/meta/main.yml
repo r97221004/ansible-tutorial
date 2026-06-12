@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: k3s
+  description: 安裝 / 解除安裝 K3s 單節點叢集，並佈署 kubeconfig
+  license: MIT
+  min_ansible_version: "2.14"
+dependencies: []

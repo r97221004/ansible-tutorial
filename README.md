@@ -771,3 +771,167 @@ ansible/playbooks/
 ```
 
 > Ansible looks for `roles/` next to the playbook by default, so roles must live under `playbooks/roles/`.
+
+---
+
+### k3s Role
+
+**roles/k3s/defaults/main.yml**
+
+```yaml
+---
+# k3s role 的預設變數，可在 inventory 或 playbook 覆寫
+
+# present = 安裝，absent = 解除安裝
+k3s_state: present
+
+# kubeconfig 要交給哪個一般使用者（預設用連線的 ansible_user）
+k3s_user: "{{ ansible_user }}"
+
+# k3s 官方安裝腳本來源
+k3s_install_url: https://get.k3s.io
+```
+
+- `k3s_state` → controls which task file `tasks/main.yml` runs (see [Ansible Roles](#ansible-roles))
+- `k3s_user` → defaults to `ansible_user` from the inventory, so kubeconfig ends up owned by the right login user
+- `k3s_install_url` → k3s's official install script, kept as a variable so it can be overridden (e.g. for a mirror)
+
+**roles/k3s/tasks/main.yml**
+
+```yaml
+---
+# 依 k3s_state 決定要安裝還是解除安裝，細節拆到各自的 task 檔
+- name: 安裝 k3s
+  ansible.builtin.include_tasks: install.yml
+  when: k3s_state == "present"
+
+- name: 解除安裝 k3s
+  ansible.builtin.include_tasks: uninstall.yml
+  when: k3s_state == "absent"
+```
+
+#### Install — tasks/install.yml
+
+```yaml
+---
+- name: 下載並執行 k3s 安裝腳本
+  ansible.builtin.shell: curl -sfL {{ k3s_install_url }} | sh -
+  args:
+    creates: /usr/local/bin/k3s    # binary 已存在就跳過，維持冪等
+
+- name: 確認 k3s 服務啟動且設為開機自動啟動
+  ansible.builtin.systemd:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: 等待 kubeconfig 產生
+  ansible.builtin.wait_for:
+    path: /etc/rancher/k3s/k3s.yaml
+    state: present
+    timeout: 60       # 首次安裝時 k3s 啟動後需要一點時間才會寫出這個檔案
+
+- name: 查詢 node 狀態
+  ansible.builtin.command: k3s kubectl get nodes
+  register: k3s_nodes
+  changed_when: false              # 只是查詢，不算變更
+
+- name: 印出 node 狀態
+  ansible.builtin.debug:
+    msg: "{{ k3s_nodes.stdout_lines }}"
+
+- name: 建立 .kube 目錄
+  ansible.builtin.file:
+    path: "/home/{{ k3s_user }}/.kube"
+    state: directory
+    owner: "{{ k3s_user }}"
+    mode: '0755'
+
+- name: 複製 kubeconfig 給一般使用者
+  ansible.builtin.copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "/home/{{ k3s_user }}/.kube/config"
+    owner: "{{ k3s_user }}"
+    mode: '0600'                   # 內含憑證，只給擁有者讀寫
+    remote_src: true
+```
+
+- `creates: /usr/local/bin/k3s` → on re-runs, the install script is skipped entirely
+- `wait_for: ... state: present` → on a fresh install, k3s needs a moment after the service starts before it writes `/etc/rancher/k3s/k3s.yaml`; this waits for the file instead of racing it
+- `changed_when: false` → this is a read-only query, so it never reports `changed`
+- `remote_src: true` → `/etc/rancher/k3s/k3s.yaml` is read from the **target machine**, not the control machine
+
+#### Uninstall — tasks/uninstall.yml
+
+```yaml
+---
+- name: 執行 k3s 解除安裝腳本
+  ansible.builtin.command: /usr/local/bin/k3s-uninstall.sh
+  args:
+    removes: /usr/local/bin/k3s    # binary 不存在就跳過
+
+- name: 清除 k3s 設定與資料目錄
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher
+    - /var/lib/rancher
+
+- name: 移除 kubeconfig
+  ansible.builtin.file:
+    path: "/home/{{ k3s_user }}/.kube/config"
+    state: absent
+
+- name: 確認 k3s binary 已移除
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: 印出解除安裝結果
+  ansible.builtin.debug:
+    msg: "{{ 'k3s 已成功解除安裝' if not k3s_binary.stat.exists else 'k3s 還在，解除安裝失敗' }}"
+```
+
+- `removes: /usr/local/bin/k3s` → the opposite of `creates:`; skips the script once k3s is already gone
+- `/etc/rancher` / `/var/lib/rancher` → removed again here in case the uninstall script left anything behind
+- final `debug` → reports success/failure based on whether the binary is actually gone
+
+#### Run
+
+Same role, two playbooks — only the `roles:` entry differs:
+
+```yaml
+# playbooks/install_k3s.yml — k3s_state defaults to "present"
+---
+- name: 安裝 K3s 叢集
+  hosts: control
+  become: true                     # k3s 安裝 / systemd / 讀 /etc/rancher 都需要 root
+  roles:
+    - k3s
+```
+
+```yaml
+# playbooks/uninstall_k3s.yml — overrides k3s_state to "absent"
+---
+- name: 解除安裝 K3s 叢集
+  hosts: control
+  become: true
+  roles:
+    - role: k3s
+      k3s_state: absent
+```
+
+```bash
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_k3s.yml
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_k3s.yml
+```
+
+#### Verify
+
+```bash
+k3s --version                # check version
+k3s kubectl get nodes         # confirm node status is Ready
+k3s kubectl get pods -A       # view pods across all namespaces
+sudo systemctl status k3s     # confirm the service is running
+```

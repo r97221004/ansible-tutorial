@@ -1,0 +1,11 @@
+---
+# k3s role 的預設變數，可在 inventory 或 playbook 覆寫
+
+# present = 安裝，absent = 解除安裝
+k3s_state: present
+
+# kubeconfig 要交給哪個一般使用者（預設用連線的 ansible_user）
+k3s_user: "{{ ansible_user }}"
+
+# k3s 官方安裝腳本來源
+k3s_install_url: https://get.k3s.io

@@ -1,0 +1,41 @@
+---
+- name: 下載並執行 k3s 安裝腳本
+  ansible.builtin.shell: curl -sfL {{ k3s_install_url }} | sh -
+  args:
+    creates: /usr/local/bin/k3s    # binary 已存在就跳過，維持冪等
+
+- name: 確認 k3s 服務啟動且設為開機自動啟動
+  ansible.builtin.systemd:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: 等待 kubeconfig 產生
+  ansible.builtin.wait_for:
+    path: /etc/rancher/k3s/k3s.yaml
+    state: present
+    timeout: 60       # 首次安裝時 k3s 啟動後需要一點時間才會寫出這個檔案
+
+- name: 查詢 node 狀態
+  ansible.builtin.command: k3s kubectl get nodes
+  register: k3s_nodes
+  changed_when: false              # 只是查詢，不算變更
+
+- name: 印出 node 狀態
+  ansible.builtin.debug:
+    msg: "{{ k3s_nodes.stdout_lines }}"
+
+- name: 建立 .kube 目錄
+  ansible.builtin.file:
+    path: "/home/{{ k3s_user }}/.kube"
+    state: directory
+    owner: "{{ k3s_user }}"
+    mode: '0755'
+
+- name: 複製 kubeconfig 給一般使用者
+  ansible.builtin.copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "/home/{{ k3s_user }}/.kube/config"
+    owner: "{{ k3s_user }}"
+    mode: '0600'                   # 內含憑證，只給擁有者讀寫
+    remote_src: true

@@ -1,0 +1,9 @@
+---
+# 依 k3s_state 決定要安裝還是解除安裝，細節拆到各自的 task 檔
+- name: 安裝 k3s
+  ansible.builtin.include_tasks: install.yml
+  when: k3s_state == "present"
+
+- name: 解除安裝 k3s
+  ansible.builtin.include_tasks: uninstall.yml
+  when: k3s_state == "absent"
