@@ -1,0 +1,14 @@
+---
+- name: Demonstrate variables
+  hosts: control
+  become: true
+  tasks:
+    - name: Install packages from group_vars
+      apt:
+        name: "{{ demo_packages }}"
+        state: present
+        update_cache: true
+
+    - name: Show host_vars message
+      debug:
+        msg: "{{ demo_motd_message }}"
