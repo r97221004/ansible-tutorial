@@ -1,0 +1,10 @@
+---
+# 安裝叢集操作工具（k9s）
+# 預設裝在 control node，方便 SSH 進去用 k9s 巡檢；
+# 若想裝到本機操作遠端叢集，改成 hosts: local 並指定 localhost inventory：
+#   ansible-playbook -i inventory/localhost.ini playbooks/install_kube_tools.yml
+# 用法（裝到 control node）：ansible-playbook playbooks/install_kube_tools.yml
+- name: 安裝 kube 操作工具
+  hosts: control
+  roles:
+    - kube_tools

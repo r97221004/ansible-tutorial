@@ -1,0 +1,6 @@
+---
+- name: 移除 k9s binary
+  become: true
+  ansible.builtin.file:
+    path: "{{ k9s_bin_dir }}/k9s"
+    state: absent

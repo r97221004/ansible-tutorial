@@ -935,3 +935,145 @@ k3s kubectl get nodes         # confirm node status is Ready
 k3s kubectl get pods -A       # view pods across all namespaces
 sudo systemctl status k3s     # confirm the service is running
 ```
+
+---
+
+### kube_tools Role (k9s)
+
+**roles/kube_tools/defaults/main.yml**
+
+```yaml
+---
+# kube_tools role 的預設變數，可在 inventory 或 playbook 覆寫
+
+# present = 安裝，absent = 解除安裝
+kube_tools_state: present
+
+# k9s 版本：latest 取最新發行，或指定如 v0.32.5 做版本鎖定
+k9s_version: latest
+
+# binary 安裝位置
+k9s_bin_dir: /usr/local/bin
+
+# 依版本組出下載網址（latest 用 /latest/download，指定版本用 /download/<tag>）
+k9s_url: >-
+  {{
+    'https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz'
+    if k9s_version == 'latest'
+    else 'https://github.com/derailed/k9s/releases/download/' ~ k9s_version ~ '/k9s_Linux_amd64.tar.gz'
+  }}
+```
+
+- `kube_tools_state` → same present/absent dispatch pattern as the k3s role (see [Ansible Roles](#ansible-roles))
+- `k9s_version` → `latest` always grabs the newest release; pinning a version (e.g. `v0.32.5`) keeps installs reproducible
+- `k9s_bin_dir` → where the k9s binary gets installed, defaults to `/usr/local/bin` like k3s
+- `k9s_url` → a Jinja2 conditional that builds the download URL from `k9s_version` — `latest` and a pinned version use different GitHub Releases paths
+
+**roles/kube_tools/tasks/main.yml**
+
+```yaml
+---
+# 依 kube_tools_state 決定要安裝還是解除安裝
+- name: 安裝 kube 工具
+  ansible.builtin.include_tasks: install.yml
+  when: kube_tools_state == "present"
+
+- name: 解除安裝 kube 工具
+  ansible.builtin.include_tasks: uninstall.yml
+  when: kube_tools_state == "absent"
+```
+
+#### Install — tasks/install.yml
+
+```yaml
+---
+- name: 下載 k9s
+  ansible.builtin.get_url:
+    url: "{{ k9s_url }}"
+    dest: /tmp/k9s.tar.gz
+    mode: '0644'
+    timeout: 120                   # 檔案約 40MB，放寬逾時
+  register: k9s_download
+  retries: 3                       # 網路抖動時最多重試 3 次
+  delay: 5
+  until: k9s_download is succeeded
+
+- name: 解壓縮 k9s
+  ansible.builtin.unarchive:
+    src: /tmp/k9s.tar.gz
+    dest: /tmp/
+    remote_src: true
+
+- name: 安裝 k9s binary
+  become: true                     # 只有寫入 /usr/local/bin 需要 root
+  ansible.builtin.copy:
+    src: /tmp/k9s
+    dest: "{{ k9s_bin_dir }}/k9s"
+    mode: '0755'
+    remote_src: true
+
+- name: 確認 k9s 版本
+  ansible.builtin.command: k9s version
+  register: k9s_check
+  changed_when: false
+
+- name: 印出 k9s 版本
+  ansible.builtin.debug:
+    msg: "{{ k9s_check.stdout_lines }}"
+```
+
+- `retries` / `delay` / `until` → retries the download up to 3 times, 5 seconds apart, to handle network blips
+- `unarchive` → k9s releases ship as a `.tar.gz`; extract to `/tmp/` and pull the binary out
+- `become: true` only on the task that installs the k9s binary → task-level become (see [become — Privilege Escalation](#become-privilege-escalation)): downloading and extracting happen in `/tmp`, only writing to `/usr/local/bin` needs root, so the whole play doesn't need `become: true`
+- `changed_when: false` → just a version check, never reports `changed`
+
+#### Uninstall — tasks/uninstall.yml
+
+```yaml
+---
+- name: 移除 k9s binary
+  become: true
+  ansible.builtin.file:
+    path: "{{ k9s_bin_dir }}/k9s"
+    state: absent
+```
+
+- k9s is just a standalone binary — no systemd service, config file, or data directory — so uninstalling is just deleting this one file, much simpler than k3s's multi-step uninstall
+
+#### Run
+
+```yaml
+# playbooks/install_kube_tools.yml — kube_tools_state defaults to "present"
+---
+- name: 安裝 kube 操作工具
+  hosts: control
+  roles:
+    - kube_tools
+```
+
+```yaml
+# playbooks/uninstall_kube_tools.yml — overrides kube_tools_state to "absent"
+---
+- name: 解除安裝 kube 操作工具
+  hosts: control
+  roles:
+    - role: kube_tools
+      kube_tools_state: absent
+```
+
+```bash
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kube_tools.yml
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kube_tools.yml
+```
+
+- Unlike the k3s play, there's **no play-level `become: true`** here — only the task that writes `/usr/local/bin/k9s` declares its own `become: true`; everything else runs as the normal user
+- `hosts: control` → installs on the control node by default, so you can SSH in and use k9s to inspect the cluster; to run it locally against a remote cluster instead, change to `hosts: local` with a local inventory
+
+#### Verify
+
+```bash
+k9s version           # check version
+k9s                   # launch the TUI, reads ~/.kube/config (the copy made by the k3s role)
+```
+
+Once inside, you'll see nodes, pods, and other resources; press `:q` or `Ctrl-C` to exit.

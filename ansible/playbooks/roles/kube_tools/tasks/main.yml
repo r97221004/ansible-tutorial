@@ -1,0 +1,9 @@
+---
+# 依 kube_tools_state 決定要安裝還是解除安裝
+- name: 安裝 kube 工具
+  ansible.builtin.include_tasks: install.yml
+  when: kube_tools_state == "present"
+
+- name: 解除安裝 kube 工具
+  ansible.builtin.include_tasks: uninstall.yml
+  when: kube_tools_state == "absent"

@@ -1,0 +1,9 @@
+---
+# 解除安裝叢集操作工具（k9s）
+# 預設移除 control node 上的 k9s；本機請加 -i inventory/localhost.ini 並改 hosts: local
+# 用法：ansible-playbook playbooks/uninstall_kube_tools.yml
+- name: 解除安裝 kube 操作工具
+  hosts: control
+  roles:
+    - role: kube_tools
+      kube_tools_state: absent

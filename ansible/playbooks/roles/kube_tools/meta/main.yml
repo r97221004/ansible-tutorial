@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: kube_tools
+  description: 安裝 / 解除安裝叢集操作工具（k9s）
+  license: MIT
+  min_ansible_version: "2.14"
+dependencies: []
