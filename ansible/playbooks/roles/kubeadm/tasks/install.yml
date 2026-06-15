@@ -3,4 +3,3 @@
 - import_tasks: containerd.yml
 - import_tasks: init.yml
 - import_tasks: flannel.yml
-- import_tasks: k9s.yml

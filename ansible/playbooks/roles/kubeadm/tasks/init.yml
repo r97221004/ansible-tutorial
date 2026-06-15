@@ -11,14 +11,14 @@
 
 - name: 等待 etcd 就緒
   wait_for:
-    host: "{{ ansible_host }}"
+    host: "{{ ansible_default_ipv4.address }}"
     port: 2379
     delay: 10
     timeout: 120
 
 - name: 等待 API server 就緒
   wait_for:
-    host: "{{ ansible_host }}"
+    host: "{{ ansible_default_ipv4.address }}"
     port: 6443
     delay: 30
     timeout: 180

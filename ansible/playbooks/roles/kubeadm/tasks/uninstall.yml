@@ -1,9 +1,4 @@
 ---
-- name: 移除 k9s binary
-  file:
-    path: /usr/local/bin/k9s
-    state: absent
-
 - name: 執行 kubeadm reset
   command: kubeadm reset -f --cri-socket=unix:///var/run/containerd/containerd.sock
   args:

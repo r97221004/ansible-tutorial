@@ -3,4 +3,3 @@
 kubeadm_state: present
 
 flannel_iface: "eth0"
-k9s_url: "https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz"
