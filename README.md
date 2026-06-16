@@ -119,31 +119,26 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 
 ```mermaid
 flowchart LR
-    subgraph control["�️&nbsp; Control machine — your laptop"]
+    subgraph control["Control machine — your laptop"]
         direction TB
-        inv["📋 inventory<br/><sub>which hosts + vars</sub>"]
-        pb["📜 playbooks<br/><sub>install / uninstall</sub>"]
-        roles["📦 roles<br/><sub>k3s · kubeadm · kube_tools</sub>"]
-        inv --> pb --> roles
+        inv["inventory<br/>hosts &amp; connection vars"]
+        pb["playbooks + roles<br/>k3s · kubeadm · kube_tools"]
     end
 
-    subgraph target["☁️&nbsp; Target VM — Ubuntu 22.04 · [control] group"]
-        direction TB
-        cluster["☸️ Single-node Kubernetes<br/><sub>k3s OR kubeadm</sub>"]
-        k9s["🐶 k9s<br/><sub>cluster TUI</sub>"]
-        cluster -.->|inspect| k9s
+    subgraph target["Target VM — Ubuntu 22.04"]
+        k8s["k3s OR kubeadm<br/>single-node cluster"]
     end
 
-    control ===>|"SSH · tasks run as root"| target
+    control -->|"SSH · sudo where needed"| target
 
-    classDef ctrl fill:#1f6feb1a,stroke:#1f6feb,stroke-width:1.5px,color:#c9d1d9,rx:6,ry:6;
-    classDef tgt fill:#2386361a,stroke:#238636,stroke-width:1.5px,color:#c9d1d9,rx:6,ry:6;
+    classDef ctrl fill:#1f6feb1a,stroke:#1f6feb,stroke-width:1.5px,color:#c9d1d9;
+    classDef tgt fill:#2386361a,stroke:#238636,stroke-width:1.5px,color:#c9d1d9;
     class control ctrl;
     class target tgt;
 ```
 
-- You run `ansible-playbook` on the **control machine**; nothing is installed there.
-- The **inventory → playbooks → roles** chain is all Ansible reads — then it connects over **SSH** and applies the tasks on the **target VM**, which becomes a single-node Kubernetes control node.
+- You run `ansible-playbook` on the **control machine**; nothing is installed on the target by Ansible itself.
+- Ansible reads the **inventory** (which hosts, how to connect) and the **playbooks + roles** (what to do) independently, then connects over **SSH** and applies the tasks on the **target VM**.
 - The same playbook works for one VM or many — you only change the inventory.
 
 ## Repository Map
@@ -206,11 +201,11 @@ host_key_checking = False         # avoids getting stuck on the host key prompt 
 
 ```mermaid
 flowchart LR
-    inv["📋 inventory"] -- "which machines" --> ans(("⚙️ Ansible"))
-    pb["📜 playbook"] -- "what tasks" --> ans
-    ans --> run["▶️ run tasks on target"]
+    inv["inventory"] -- "which machines" --> ans(("Ansible"))
+    pb["playbook"] -- "what tasks" --> ans
+    ans --> run["run tasks on target"]
 
-    classDef node fill:#1f6feb22,stroke:#1f6feb,stroke-width:1px,color:#c9d1d9;
+    classDef node fill:#1f6feb1a,stroke:#1f6feb,stroke-width:1px,color:#c9d1d9;
     class inv,pb,ans,run node;
 ```
 
