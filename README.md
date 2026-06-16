@@ -1,10 +1,67 @@
 # Ansible in Practice
 
+![Ansible](https://img.shields.io/badge/Ansible-2.14%2B-EE0000?logo=ansible&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Ubuntu%2022.04-E95420?logo=ubuntu&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Lab-k3s%20%7C%20kubeadm-326CE5?logo=kubernetes&logoColor=white)
+[![License: MIT](https://img.shields.io/github/license/r97221004/ansible-tutorial?color=green)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/r97221004/ansible-tutorial?style=social)](https://github.com/r97221004/ansible-tutorial/stargazers)
+[![Last commit](https://img.shields.io/github/last-commit/r97221004/ansible-tutorial)](https://github.com/r97221004/ansible-tutorial/commits)
+
 > **Problem**: Manually SSH-ing into multiple machines to install packages, copy configs, and start services is slow, repetitive, and easy to get inconsistent.
 >
 > **Solution**: Ansible lets you describe the desired state of your machines in YAML playbooks and apply them to any number of hosts over SSH — repeatably and idempotently.
 
+A hands-on, example-driven Ansible refresher. Each concept is paired with a runnable playbook, and it all builds toward one concrete outcome: **provisioning a single-node Kubernetes lab (k3s or kubeadm) on a remote VM over SSH** — then tearing it back down, idempotently.
+
+<!-- TODO: add a demo screenshot/GIF here for stronger first impression.
+     Suggested: a k9s TUI shot or the install run. Save it under docs/images/
+     and uncomment the line below.
+![k9s inspecting the cluster](docs/images/k9s-demo.png)
+-->
+
+> Best for readers who already know Ansible basics and want a fast, practical refresh (~20–40 min). New to Ansible? Read top to bottom. Just refreshing? Jump straight to the [Table of Contents](#table-of-contents).
+
+## Quick Start
+
+Already have Ansible installed and a reachable Linux VM? Get a Kubernetes node running in three commands:
+
+```bash
+# 1. Point the inventory at your VM (edit ansible/inventory/azure.ini)
+#    [control]
+#    <YOUR_VM_IP> ansible_user=<YOUR_USER> ansible_connection=ssh
+
+# 2. Confirm Ansible can reach it
+ansible control -i ansible/inventory/azure.ini -m ping
+
+# 3. Install a single-node k3s cluster
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_k3s.yml
+```
+
+Expected tail of the install run:
+
+```
+TASK [k3s : Print node status] *************************************************
+ok: [<YOUR_VM_IP>] => {
+    "msg": ["NAME      STATUS   ROLES                  AGE   VERSION",
+            "<vm>      Ready    control-plane,master   30s   v1.x.x+k3s1"]
+}
+
+PLAY RECAP *********************************************************************
+<YOUR_VM_IP> : ok=8  changed=5  unreachable=0  failed=0
+```
+
+Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prerequisites) and [Switch to SSH Connection](#switch-to-ssh-connection).
+
 ## Table of Contents
+
+**Getting Started**
+
+- [**What You'll Learn**](#what-youll-learn)
+- [**Prerequisites**](#prerequisites)
+- [**Architecture Overview**](#architecture-overview)
+- [**Repository Map**](#repository-map)
+
+**Part 1 — Fundamentals**
 
 - [**Install Ansible**](#install-ansible)
 - [**ansible.cfg**](#ansiblecfg)
@@ -12,6 +69,9 @@
 - [**Switch to SSH Connection**](#switch-to-ssh-connection)
 - [**Ad-hoc Commands**](#ad-hoc-commands)
 - [**Common Modules**](#common-modules)
+
+**Part 2 — Reusable Playbooks**
+
 - [**Idempotency**](#idempotency)
 - [**become — Privilege Escalation**](#become-privilege-escalation)
 - [**Variables**](#variables)
@@ -19,9 +79,82 @@
 - [**loop**](#loop)
 - [**Error Handling**](#error-handling)
 - [**Ansible Vault**](#ansible-vault)
+
+**Part 3 — Scaling with Roles**
+
 - [**Ansible Roles**](#ansible-roles)
   - [**k3s Role**](#k3s-role)
   - [**kube_tools Role (k9s)**](#kube_tools-role-k9s)
+  - [**kubeadm Role**](#kubeadm-role)
+- [**Choosing k3s vs kubeadm**](#choosing-k3s-vs-kubeadm)
+
+**Part 4 — Running & Operating**
+
+- [**Running the Playbooks**](#running-the-playbooks)
+- [**Troubleshooting**](#troubleshooting)
+- [**FAQ**](#faq)
+- [**Next Steps**](#next-steps)
+- [**Contributing**](#contributing)
+
+---
+
+## What You'll Learn
+
+- **Drive remote machines over SSH** with ad-hoc commands and playbooks — no manual SSH sessions.
+- **Write idempotent tasks** so re-running a playbook is always safe.
+- **Parameterize playbooks** with inventory, `group_vars`/`host_vars`, and Ansible Vault for secrets.
+- **Control flow** with `when`, `loop`, privilege escalation (`become`), and error handling.
+- **Package logic into roles** and use them to install/uninstall a single-node Kubernetes lab (k3s, kubeadm) plus tooling (k9s).
+
+## Prerequisites
+
+- **A control machine** (your laptop) with **Ansible 2.14+** and SSH installed.
+- **A target Linux VM** you can reach over SSH — examples use **Ubuntu 22.04** (e.g. an Azure VM).
+- **An SSH key pair**, with the public key copied to the target (covered in [Switch to SSH Connection](#switch-to-ssh-connection)).
+- **Passwordless sudo** on the target, or a Vault-stored `ansible_become_pass` (covered in [become](#become-privilege-escalation)).
+- **Basic comfort** with the Linux shell and YAML.
+
+> Tested with: Ansible 2.14+, Ubuntu 22.04, k3s v1.x, kubeadm/Kubernetes v1.30, k9s latest.
+
+## Architecture Overview
+
+```
+┌──────────────────────────┐         ┌──────────────────────────────┐
+│   Control machine         │         │   Target VM ([control] group) │
+│   (your laptop)           │         │   Ubuntu 22.04                 │
+│                           │  SSH    │                                │
+│   ansible-playbook  ──────┼────────▶│   tasks run here as root       │
+│   inventory + playbooks   │         │   ├─ k3s  OR  kubeadm cluster   │
+│   + roles                 │         │   └─ k9s (cluster TUI)          │
+└──────────────────────────┘         └──────────────────────────────┘
+```
+
+- You run `ansible-playbook` on the **control machine**; nothing is installed there.
+- Ansible connects over **SSH** and applies tasks on the **target VM**, which becomes a single-node Kubernetes control node.
+- The same playbook works for one VM or many — you only change the inventory.
+
+## Repository Map
+
+```
+ansible/
+├── ansible.cfg                 # default inventory + SSH behavior
+├── inventory/
+│   ├── localhost.ini           # [local] group, runs tasks on your machine
+│   ├── azure.ini               # [control]/[node] groups for remote VMs  ← edit this
+│   ├── group_vars/control/     # vars.yml (plain) + vault.yml (encrypted)
+│   └── host_vars/              # per-host variables
+└── playbooks/
+    ├── hello.yml               # first playbook (debug output)
+    ├── demo_variables.yml      # variables + Vault demo
+    ├── install_*.yml           # install entrypoints (k3s, kubeadm, kube_tools)
+    ├── uninstall_*.yml         # matching uninstall entrypoints
+    └── roles/                  # reusable logic
+        ├── k3s/                # lightweight single-node Kubernetes
+        ├── kubeadm/            # upstream Kubernetes (containerd + flannel)
+        └── kube_tools/         # k9s terminal UI
+```
+
+> Start in `inventory/azure.ini` (set your VM), then run a playbook from `playbooks/`.
 
 ---
 
@@ -538,10 +671,10 @@ demo_motd_message: "Welcome to the control node"
 
 The filename (or directory name) must match the group name from the inventory (e.g. `control`) or the host (IP/hostname).
 
-|                          | matches by               | scope                               |
-| ------------------------ | ------------------------ | ----------------------------------- |
+|                                                   | matches by               | scope                               |
+| ------------------------------------------------- | ------------------------ | ----------------------------------- |
 | `group_vars/<group>.yml` or `group_vars/<group>/` | inventory **group name** | every host in that group            |
-| `host_vars/<host>.yml`   | inventory **host name**  | only that host, regardless of group |
+| `host_vars/<host>.yml`                            | inventory **host name**  | only that host, regardless of group |
 
 > `group_vars/<group>/` can be a **directory** instead of a single file — every `.yml` file inside it is loaded and merged. This is the standard way to keep plaintext variables (`vars.yml`) and [Vault-encrypted](#ansible-vault) variables (`vault.yml`) side by side.
 
@@ -709,13 +842,13 @@ Encrypts sensitive data (passwords, tokens, private keys) so it can be safely co
 
 ### Basic commands
 
-| Command                        | Description                                  |
-| ------------------------------- | --------------------------------------------- |
-| `ansible-vault create <file>`  | create a new encrypted file                  |
-| `ansible-vault edit <file>`    | edit an encrypted file in place              |
-| `ansible-vault encrypt <file>` | encrypt an existing plaintext file           |
-| `ansible-vault decrypt <file>` | decrypt back to plaintext                    |
-| `ansible-vault view <file>`    | view contents without decrypting on disk     |
+| Command                        | Description                              |
+| ------------------------------ | ---------------------------------------- |
+| `ansible-vault create <file>`  | create a new encrypted file              |
+| `ansible-vault edit <file>`    | edit an encrypted file in place          |
+| `ansible-vault encrypt <file>` | encrypt an existing plaintext file       |
+| `ansible-vault decrypt <file>` | decrypt back to plaintext                |
+| `ansible-vault view <file>`    | view contents without decrypting on disk |
 
 ### Example
 
@@ -780,15 +913,15 @@ ansible/playbooks/
 
 ```yaml
 ---
-# k3s role 的預設變數，可在 inventory 或 playbook 覆寫
+# Default variables for the k3s role; override in inventory or the playbook
 
-# present = 安裝，absent = 解除安裝
+# present = install, absent = uninstall
 k3s_state: present
 
-# kubeconfig 要交給哪個一般使用者（預設用連線的 ansible_user）
+# Which regular user should own kubeconfig (defaults to the connecting ansible_user)
 k3s_user: "{{ ansible_user }}"
 
-# k3s 官方安裝腳本來源
+# k3s official install script source
 k3s_install_url: https://get.k3s.io
 ```
 
@@ -800,12 +933,12 @@ k3s_install_url: https://get.k3s.io
 
 ```yaml
 ---
-# 依 k3s_state 決定要安裝還是解除安裝，細節拆到各自的 task 檔
-- name: 安裝 k3s
+# Dispatch to install or uninstall based on k3s_state; details live in each task file
+- name: Install k3s
   ansible.builtin.include_tasks: install.yml
   when: k3s_state == "present"
 
-- name: 解除安裝 k3s
+- name: Uninstall k3s
   ansible.builtin.include_tasks: uninstall.yml
   when: k3s_state == "absent"
 ```
@@ -814,45 +947,45 @@ k3s_install_url: https://get.k3s.io
 
 ```yaml
 ---
-- name: 下載並執行 k3s 安裝腳本
+- name: Download and run the k3s install script
   ansible.builtin.shell: curl -sfL {{ k3s_install_url }} | sh -
   args:
-    creates: /usr/local/bin/k3s    # binary 已存在就跳過，維持冪等
+    creates: /usr/local/bin/k3s # skip if the binary already exists (idempotent)
 
-- name: 確認 k3s 服務啟動且設為開機自動啟動
+- name: Ensure k3s is running and enabled on boot
   ansible.builtin.systemd:
     name: k3s
     state: started
     enabled: true
 
-- name: 等待 kubeconfig 產生
+- name: Wait for kubeconfig to be generated
   ansible.builtin.wait_for:
     path: /etc/rancher/k3s/k3s.yaml
     state: present
-    timeout: 60       # 首次安裝時 k3s 啟動後需要一點時間才會寫出這個檔案
+    timeout: 60 # on a fresh install, k3s needs a moment after start to write this file
 
-- name: 查詢 node 狀態
+- name: Query node status
   ansible.builtin.command: k3s kubectl get nodes
   register: k3s_nodes
-  changed_when: false              # 只是查詢，不算變更
+  changed_when: false # read-only query, never a change
 
-- name: 印出 node 狀態
+- name: Print node status
   ansible.builtin.debug:
     msg: "{{ k3s_nodes.stdout_lines }}"
 
-- name: 建立 .kube 目錄
+- name: Create the .kube directory
   ansible.builtin.file:
     path: "/home/{{ k3s_user }}/.kube"
     state: directory
     owner: "{{ k3s_user }}"
-    mode: '0755'
+    mode: "0755"
 
-- name: 複製 kubeconfig 給一般使用者
+- name: Copy kubeconfig to the regular user
   ansible.builtin.copy:
     src: /etc/rancher/k3s/k3s.yaml
     dest: "/home/{{ k3s_user }}/.kube/config"
     owner: "{{ k3s_user }}"
-    mode: '0600'                   # 內含憑證，只給擁有者讀寫
+    mode: "0600" # contains credentials, owner read/write only
     remote_src: true
 ```
 
@@ -865,12 +998,12 @@ k3s_install_url: https://get.k3s.io
 
 ```yaml
 ---
-- name: 執行 k3s 解除安裝腳本
+- name: Run the k3s uninstall script
   ansible.builtin.command: /usr/local/bin/k3s-uninstall.sh
   args:
-    removes: /usr/local/bin/k3s    # binary 不存在就跳過
+    removes: /usr/local/bin/k3s # skip if the binary is already gone
 
-- name: 清除 k3s 設定與資料目錄
+- name: Remove k3s config and data directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -878,19 +1011,19 @@ k3s_install_url: https://get.k3s.io
     - /etc/rancher
     - /var/lib/rancher
 
-- name: 移除 kubeconfig
+- name: Remove kubeconfig
   ansible.builtin.file:
     path: "/home/{{ k3s_user }}/.kube/config"
     state: absent
 
-- name: 確認 k3s binary 已移除
+- name: Confirm the k3s binary is removed
   ansible.builtin.stat:
     path: /usr/local/bin/k3s
   register: k3s_binary
 
-- name: 印出解除安裝結果
+- name: Print the uninstall result
   ansible.builtin.debug:
-    msg: "{{ 'k3s 已成功解除安裝' if not k3s_binary.stat.exists else 'k3s 還在，解除安裝失敗' }}"
+    msg: "{{ 'k3s uninstalled successfully' if not k3s_binary.stat.exists else 'k3s is still present, uninstall failed' }}"
 ```
 
 - `removes: /usr/local/bin/k3s` → the opposite of `creates:`; skips the script once k3s is already gone
@@ -904,9 +1037,9 @@ Same role, two playbooks — only the `roles:` entry differs:
 ```yaml
 # playbooks/install_k3s.yml — k3s_state defaults to "present"
 ---
-- name: 安裝 K3s 叢集
+- name: Install K3s cluster
   hosts: control
-  become: true                     # k3s 安裝 / systemd / 讀 /etc/rancher 都需要 root
+  become: true # install / systemd / reading /etc/rancher all need root
   roles:
     - k3s
 ```
@@ -914,7 +1047,7 @@ Same role, two playbooks — only the `roles:` entry differs:
 ```yaml
 # playbooks/uninstall_k3s.yml — overrides k3s_state to "absent"
 ---
-- name: 解除安裝 K3s 叢集
+- name: Uninstall K3s cluster
   hosts: control
   become: true
   roles:
@@ -944,18 +1077,18 @@ sudo systemctl status k3s     # confirm the service is running
 
 ```yaml
 ---
-# kube_tools role 的預設變數，可在 inventory 或 playbook 覆寫
+# Default variables for the kube_tools role; override in inventory or the playbook
 
-# present = 安裝，absent = 解除安裝
+# present = install, absent = uninstall
 kube_tools_state: present
 
-# k9s 版本：latest 取最新發行，或指定如 v0.32.5 做版本鎖定
+# k9s version: latest grabs the newest release, or pin one like v0.32.5
 k9s_version: latest
 
-# binary 安裝位置
+# binary install location
 k9s_bin_dir: /usr/local/bin
 
-# 依版本組出下載網址（latest 用 /latest/download，指定版本用 /download/<tag>）
+# Build the download URL from the version (latest uses /latest/download, pinned uses /download/<tag>)
 k9s_url: >-
   {{
     'https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz'
@@ -973,12 +1106,12 @@ k9s_url: >-
 
 ```yaml
 ---
-# 依 kube_tools_state 決定要安裝還是解除安裝
-- name: 安裝 kube 工具
+# Dispatch to install or uninstall based on kube_tools_state
+- name: Install kube tools
   ansible.builtin.include_tasks: install.yml
   when: kube_tools_state == "present"
 
-- name: 解除安裝 kube 工具
+- name: Uninstall kube tools
   ansible.builtin.include_tasks: uninstall.yml
   when: kube_tools_state == "absent"
 ```
@@ -987,37 +1120,37 @@ k9s_url: >-
 
 ```yaml
 ---
-- name: 下載 k9s
+- name: Download k9s
   ansible.builtin.get_url:
     url: "{{ k9s_url }}"
     dest: /tmp/k9s.tar.gz
-    mode: '0644'
-    timeout: 120                   # 檔案約 40MB，放寬逾時
+    mode: "0644"
+    timeout: 120 # ~40MB file, give it extra time
   register: k9s_download
-  retries: 3                       # 網路抖動時最多重試 3 次
+  retries: 3 # retry up to 3 times on network blips
   delay: 5
   until: k9s_download is succeeded
 
-- name: 解壓縮 k9s
+- name: Extract k9s
   ansible.builtin.unarchive:
     src: /tmp/k9s.tar.gz
     dest: /tmp/
     remote_src: true
 
-- name: 安裝 k9s binary
-  become: true                     # 只有寫入 /usr/local/bin 需要 root
+- name: Install the k9s binary
+  become: true # only writing to /usr/local/bin needs root
   ansible.builtin.copy:
     src: /tmp/k9s
     dest: "{{ k9s_bin_dir }}/k9s"
-    mode: '0755'
+    mode: "0755"
     remote_src: true
 
-- name: 確認 k9s 版本
+- name: Check the k9s version
   ansible.builtin.command: k9s version
   register: k9s_check
   changed_when: false
 
-- name: 印出 k9s 版本
+- name: Print the k9s version
   ansible.builtin.debug:
     msg: "{{ k9s_check.stdout_lines }}"
 ```
@@ -1031,7 +1164,7 @@ k9s_url: >-
 
 ```yaml
 ---
-- name: 移除 k9s binary
+- name: Remove the k9s binary
   become: true
   ansible.builtin.file:
     path: "{{ k9s_bin_dir }}/k9s"
@@ -1045,7 +1178,7 @@ k9s_url: >-
 ```yaml
 # playbooks/install_kube_tools.yml — kube_tools_state defaults to "present"
 ---
-- name: 安裝 kube 操作工具
+- name: Install kube tools
   hosts: control
   roles:
     - kube_tools
@@ -1054,7 +1187,7 @@ k9s_url: >-
 ```yaml
 # playbooks/uninstall_kube_tools.yml — overrides kube_tools_state to "absent"
 ---
-- name: 解除安裝 kube 操作工具
+- name: Uninstall kube tools
   hosts: control
   roles:
     - role: kube_tools
@@ -1077,3 +1210,219 @@ k9s                   # launch the TUI, reads ~/.kube/config (the copy made by t
 ```
 
 Once inside, you'll see nodes, pods, and other resources; press `:q` or `Ctrl-C` to exit.
+
+---
+
+### kubeadm Role
+
+The `kubeadm` role builds an **upstream Kubernetes** single-node control plane — closer to a "real" cluster than k3s, at the cost of more moving parts. Unlike k3s (one install script), kubeadm needs the container runtime, kernel settings, and a CNI wired up by hand, so the role splits the work into a pipeline of task files.
+
+**roles/kubeadm/tasks/main.yml** dispatches on state, same pattern as the other roles:
+
+```yaml
+---
+- include_tasks: install.yml
+  when: kubeadm_state == "present"
+
+- include_tasks: uninstall.yml
+  when: kubeadm_state == "absent"
+```
+
+**The install pipeline** (`install.yml` imports these in order):
+
+```
+prerequisites.yml → containerd.yml → init.yml → flannel.yml
+```
+
+| Step                | What it does                                                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prerequisites.yml` | Loads kernel modules (`overlay`, `br_netfilter`), sets sysctl, adds the Kubernetes apt repo, installs and version-locks `kubelet`/`kubeadm`/`kubectl` |
+| `containerd.yml`    | Installs containerd and switches it to the **systemd cgroup driver** (required by kubelet)                                                            |
+| `init.yml`          | Runs `kubeadm init`, waits for etcd/API server, then copies kubeconfig to the user                                                                    |
+| `flannel.yml`       | Deploys the **flannel** CNI so pods can network and the node turns `Ready`                                                                            |
+
+> The order matters: the runtime and kernel settings must exist before `kubeadm init`, and the cluster must be initialized before a CNI can be applied. This is why the role uses `import_tasks` (a fixed, ordered sequence) rather than separate playbooks.
+
+**roles/kubeadm/defaults/main.yml**
+
+```yaml
+---
+# present = install, absent = uninstall
+kubeadm_state: present
+
+# Network interface flannel should advertise on
+flannel_iface: "eth0"
+```
+
+#### Run
+
+```yaml
+# playbooks/install_kubeadm.yml
+---
+- name: Install kubeadm cluster
+  hosts: control
+  become: true
+  roles:
+    - kubeadm
+```
+
+```bash
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kubeadm.yml
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kubeadm.yml
+```
+
+> First-time `kubeadm init` pulls several container images, so the install takes noticeably longer than k3s. Re-runs are idempotent — `creates:` on the `kubeadm init` step skips re-initializing an existing cluster.
+
+#### Verify
+
+```bash
+kubectl get nodes              # node should reach Ready once flannel is up
+kubectl get pods -A            # kube-system + flannel pods Running
+kubectl cluster-info
+```
+
+> A fresh node may show `NotReady` for a few seconds until the flannel pod starts — re-run `kubectl get nodes` and it should flip to `Ready`.
+
+---
+
+## Choosing k3s vs kubeadm
+
+Both roles give you a single-node Kubernetes control plane on the same VM. Pick based on what you're practicing:
+
+|                     | **k3s**                                       | **kubeadm**                                   |
+| ------------------- | --------------------------------------------- | --------------------------------------------- |
+| **Best for**        | Fast labs, edge/IoT, "just give me a cluster" | Learning how upstream Kubernetes is assembled |
+| **Install effort**  | One script, one task file                     | Multi-step pipeline (runtime, CNI, init)      |
+| **Components**      | Bundled (containerd, CNI, etc. built in)      | You wire up containerd + flannel yourself     |
+| **Startup time**    | Seconds                                       | Minutes (pulls control-plane images)          |
+| **Footprint**       | Lightweight (~512MB RAM)                      | Heavier                                       |
+| **Closest to prod** | Conformant but opinionated                    | Vanilla upstream Kubernetes                   |
+
+- **Just want a working cluster to run k9s against?** Use **k3s**.
+- **Want to understand kubelet, containerd, CNI, and `kubeadm init`?** Use **kubeadm**.
+- **`kube_tools` (k9s) works with either** — it just reads `~/.kube/config`, which both roles set up.
+
+> Don't install both on the same node — they fight over ports and the container runtime. Uninstall one before installing the other.
+
+---
+
+## Running the Playbooks
+
+A quick reference for the full lifecycle. All commands assume `ansible/inventory/azure.ini` points at your VM.
+
+### Typical workflow
+
+```bash
+# 1. Confirm connectivity
+ansible control -i ansible/inventory/azure.ini -m ping
+
+# 2. Install a cluster (pick one)
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_k3s.yml
+# or
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kubeadm.yml
+
+# 3. Install tooling
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kube_tools.yml
+
+# 4. Tear down when done
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_k3s.yml
+```
+
+> With `ansible.cfg`'s default inventory, you can drop `-i ansible/inventory/azure.ini` **when running from inside the `ansible/` directory**.
+
+### Checking idempotency
+
+The hallmark of a good playbook: run it twice, the second run changes nothing.
+
+```bash
+ansible-playbook ansible/playbooks/install_k3s.yml      # first run:  changed=5
+ansible-playbook ansible/playbooks/install_k3s.yml      # second run: changed=0
+```
+
+Look at the `PLAY RECAP` — a second run should report `changed=0`. Any task still reporting `changed` on every run is a candidate for a `creates:`/`changed_when:` fix (see [Idempotency](#idempotency)).
+
+---
+
+## Troubleshooting
+
+<details>
+<summary><strong>SSH: <code>UNREACHABLE</code> / Permission denied (publickey)</strong></summary>
+
+- Confirm you can SSH manually first: `ssh <user>@<ip>`.
+- Make sure your public key is on the target: `ssh-copy-id <user>@<ip>`.
+- Check the inventory line matches the real user/IP: `ansible_user=<user>`.
+- On a brand-new host, `host_key_checking = False` in `ansible.cfg` avoids the fingerprint prompt.
+- On Azure, confirm the **NSG inbound rule** allows TCP 22 from your IP.
+
+</details>
+
+<details>
+<summary><strong><code>become</code> / sudo password prompts or failures</strong></summary>
+
+- The login user needs **passwordless sudo**, or set `ansible_become_pass` (ideally via Vault).
+- Quick test: `ansible control -m command -a "id" --become`.
+- Interactive fallback: add `--ask-become-pass` (`-K`) to the command.
+
+</details>
+
+<details>
+<summary><strong><code>--ask-vault-pass</code> required / "Attempting to decrypt but no vault secrets found"</strong></summary>
+
+- Playbooks that read `group_vars/control/vault.yml` need the vault password: add `--ask-vault-pass`.
+- View encrypted contents without decrypting on disk: `ansible-vault view inventory/group_vars/control/vault.yml`.
+
+</details>
+
+<details>
+<summary><strong>kubeconfig missing / <code>kubectl</code> can't connect</strong></summary>
+
+- k3s writes `/etc/rancher/k3s/k3s.yaml`; the role copies it to `~/.kube/config`. If `kubectl`/`k9s` can't connect, confirm that copy exists and is owned by your user.
+- For k3s you can always use the bundled client: `k3s kubectl get nodes`.
+- For kubeadm, kubeconfig comes from `/etc/kubernetes/admin.conf`.
+
+</details>
+
+<details>
+<summary><strong>Node stuck in <code>NotReady</code></strong></summary>
+
+- This is almost always the CNI. For kubeadm, check the flannel pods: `kubectl get pods -n kube-flannel` (or `kube-system`).
+- Give it a few seconds after install and re-check `kubectl get nodes`.
+- If you have multiple NICs, set `flannel_iface` to the correct interface.
+
+</details>
+
+---
+
+## FAQ
+
+**Do I need a cloud VM?** No — any reachable Linux host works (a local VM, WSL, a Raspberry Pi). The examples use Azure, but only the inventory IP/user changes.
+
+**Can I run everything locally?** The teaching playbooks (`hello.yml`, `demo_variables.yml`) run against any host. For the Kubernetes roles, use a Linux VM you don't mind wiping.
+
+**Why both k3s and kubeadm?** They teach different things — see [Choosing k3s vs kubeadm](#choosing-k3s-vs-kubeadm).
+
+**Is it safe to re-run a playbook?** Yes, that's the point — they're idempotent. See [Checking idempotency](#checking-idempotency).
+
+**How do I target a different host?** Edit `ansible/inventory/azure.ini` (or pass a different `-i` inventory). No playbook changes needed.
+
+---
+
+## Next Steps
+
+- **Add a worker node**: populate the `[node]` group in the inventory and extend the roles to join workers.
+- **Pin versions**: set `k9s_version` / kubeadm Kubernetes version for reproducible builds.
+- **Deploy a workload**: `kubectl create deployment web --image=nginx` and explore it in `k9s`.
+- **Go multi-host**: point the inventory at several VMs and run the same playbook unchanged.
+
+---
+
+## Contributing
+
+Contributions and corrections are welcome.
+
+1. Fork the repo and create a branch: `git checkout -b improve-xyz`.
+2. Keep changes focused; match the existing style (English, bold-keyword bullet lists).
+3. Run a syntax check before opening a PR: `ansible-playbook --syntax-check ansible/playbooks/<playbook>.yml`.
+4. Open a pull request describing what changed and why.
+
+Found a typo or unclear explanation? Open an issue — small fixes help every future reader.

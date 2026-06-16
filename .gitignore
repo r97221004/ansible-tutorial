@@ -1,0 +1,20 @@
+# Ansible
+*.retry
+*.log
+
+# Vault password files (never commit secrets)
+.vault_pass
+.vault_pass.txt
+vault-password*
+*.vault_pass
+
+# Local inventory / secret overrides
+**/host_vars/*.local.yml
+**/group_vars/*/*.local.yml
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
