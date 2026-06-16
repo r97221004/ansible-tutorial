@@ -2,7 +2,7 @@
 - name: Download and run the k3s install script
   ansible.builtin.shell: curl -sfL {{ k3s_install_url }} | sh -
   args:
-    creates: /usr/local/bin/k3s    # skip if the binary already exists (idempotent)
+    creates: /usr/local/bin/k3s # skip if the binary already exists (idempotent)
 
 - name: Ensure k3s is running and enabled on boot
   ansible.builtin.systemd:
@@ -14,12 +14,12 @@
   ansible.builtin.wait_for:
     path: /etc/rancher/k3s/k3s.yaml
     state: present
-    timeout: 60       # on a fresh install, k3s needs a moment after start to write this file
+    timeout: 60 # on a fresh install, k3s needs a moment after start to write this file
 
 - name: Query node status
   ansible.builtin.command: k3s kubectl get nodes
   register: k3s_nodes
-  changed_when: false              # read-only query, never a change
+  changed_when: false # read-only query, never a change
 
 - name: Print node status
   ansible.builtin.debug:
@@ -30,12 +30,12 @@
     path: "/home/{{ k3s_user }}/.kube"
     state: directory
     owner: "{{ k3s_user }}"
-    mode: '0755'
+    mode: "0755"
 
 - name: Copy kubeconfig to the regular user
   ansible.builtin.copy:
     src: /etc/rancher/k3s/k3s.yaml
     dest: "/home/{{ k3s_user }}/.kube/config"
     owner: "{{ k3s_user }}"
-    mode: '0600'                   # contains credentials, owner read/write only
+    mode: "0600" # contains credentials, owner read/write only
     remote_src: true

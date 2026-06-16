@@ -1,29 +1,31 @@
 ---
 - name: Download the flannel manifest
-  get_url:
+  ansible.builtin.get_url:
     url: https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
     dest: /tmp/kube-flannel.yml
-    mode: '0644'
+    mode: "0644"
 
 - name: Pin flannel to the chosen network interface
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /tmp/kube-flannel.yml
-    insertafter: '- --kube-subnet-mgr'
-    regexp: '^\s*- --iface='
-    line: '        - --iface={{ flannel_iface }}'
+    insertafter: "- --kube-subnet-mgr"
+    regexp: "^\\s*- --iface="
+    line: "        - --iface={{ flannel_iface }}"
 
 - name: Deploy flannel
-  command: kubectl apply -f /tmp/kube-flannel.yml
+  ansible.builtin.command: kubectl apply -f /tmp/kube-flannel.yml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
+  register: flannel_apply
+  changed_when: "'created' in flannel_apply.stdout or 'configured' in flannel_apply.stdout"
 
 - name: Query node status
-  command: kubectl get nodes
+  ansible.builtin.command: kubectl get nodes
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   register: kubeadm_nodes
-  changed_when: false              # read-only query, never a change
+  changed_when: false # read-only query, never a change
 
 - name: Print node status
-  debug:
+  ansible.builtin.debug:
     msg: "{{ kubeadm_nodes.stdout_lines }}"

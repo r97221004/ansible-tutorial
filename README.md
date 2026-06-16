@@ -240,11 +240,11 @@ localhost ansible_connection=local
   hosts: local # corresponds to the [local] group in inventory
   tasks:
     - name: Print message
-      debug:
+      ansible.builtin.debug:
         msg: "Ansible is working! This machine is {{ ansible_hostname }}"
 
     - name: Check OS
-      debug:
+      ansible.builtin.debug:
         msg: "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
 ```
 
@@ -704,17 +704,17 @@ The filename (or directory name) must match the group name from the inventory (e
   become: true
   tasks:
     - name: Install packages from group_vars
-      apt:
+      ansible.builtin.apt:
         name: "{{ demo_packages }}"
         state: present
         update_cache: true
 
     - name: Show host_vars message
-      debug:
+      ansible.builtin.debug:
         msg: "{{ demo_motd_message }}"
 
     - name: Confirm ansible_become_pass was loaded from Vault
-      debug:
+      ansible.builtin.debug:
         msg: "ansible_become_pass is defined: {{ ansible_become_pass is defined }}"
 ```
 
@@ -814,12 +814,12 @@ tasks:
   - name: Configure containerd to use the systemd cgroup driver
     lineinfile:
       path: /etc/containerd/config.toml
-      regexp: 'SystemdCgroup = false'
-      line: '            SystemdCgroup = true'
-    notify: restart containerd  # queued only if this task reports changed
+      regexp: "SystemdCgroup = false"
+      line: "            SystemdCgroup = true"
+    notify: Restart containerd # queued only if this task reports changed
 
 handlers:
-  - name: restart containerd
+  - name: Restart containerd
     systemd:
       name: containerd
       state: restarted
@@ -1319,10 +1319,12 @@ The `kubeadm` role builds an **upstream Kubernetes** single-node control plane �
 
 ```yaml
 ---
-- include_tasks: install.yml
+- name: Install kubeadm cluster
+  ansible.builtin.include_tasks: install.yml
   when: kubeadm_state == "present"
 
-- include_tasks: uninstall.yml
+- name: Uninstall kubeadm cluster
+  ansible.builtin.include_tasks: uninstall.yml
   when: kubeadm_state == "absent"
 ```
 
@@ -1345,10 +1347,17 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 
 ```yaml
 ---
-- import_tasks: prerequisites.yml
-- import_tasks: containerd.yml
-- import_tasks: init.yml
-- import_tasks: flannel.yml
+- name: Install prerequisites (kernel modules, sysctl, apt repo, packages)
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: Install and configure containerd
+  ansible.builtin.import_tasks: containerd.yml
+
+- name: Initialize the cluster with kubeadm
+  ansible.builtin.import_tasks: init.yml
+
+- name: Deploy the flannel CNI
+  ansible.builtin.import_tasks: flannel.yml
 ```
 
 #### prerequisites.yml
@@ -1356,41 +1365,42 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 ```yaml
 ---
 - name: Configure kernel modules to load on boot (overlay, br_netfilter)
-  copy:
+  ansible.builtin.copy:
     dest: /etc/modules-load.d/k8s.conf
     content: |
       overlay
       br_netfilter
-    mode: '0644'
+    mode: "0644"
 
 - name: Load the overlay and br_netfilter kernel modules now
-  command: modprobe {{ item }}
+  ansible.builtin.command: modprobe {{ item }}
   loop:
     - overlay
     - br_netfilter
   changed_when: false
 
 - name: Set the sysctl parameters required by Kubernetes
-  copy:
+  ansible.builtin.copy:
     dest: /etc/sysctl.d/k8s.conf
     content: |
       net.bridge.bridge-nf-call-iptables = 1
       net.bridge.bridge-nf-call-ip6tables = 1
       net.ipv4.ip_forward = 1
-    mode: '0644'
+    mode: "0644"
   register: k8s_sysctl
 
 - name: Apply the sysctl settings
-  command: sysctl --system
+  ansible.builtin.command: sysctl --system
   when: k8s_sysctl.changed
+  changed_when: true
 
 - name: Update the apt cache
-  apt:
+  ansible.builtin.apt:
     update_cache: true
   ignore_errors: true
 
 - name: Install prerequisite packages
-  apt:
+  ansible.builtin.apt:
     name:
       - apt-transport-https
       - ca-certificates
@@ -1399,26 +1409,27 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
     state: present
 
 - name: Create the keyrings directory
-  file:
+  ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Download the Kubernetes apt key
-  shell: |
+  ansible.builtin.shell: |
     curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | \
     gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
   args:
     creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
 - name: Add the Kubernetes apt repository
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/apt/sources.list.d/kubernetes.list
     line: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /"
     create: true
+    mode: "0644"
 
 - name: Install kubelet kubeadm kubectl
-  apt:
+  ansible.builtin.apt:
     name:
       - kubelet
       - kubeadm
@@ -1427,7 +1438,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
     update_cache: true
 
 - name: Hold the versions to prevent automatic upgrades
-  dpkg_selections:
+  ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: hold
   loop:
@@ -1446,36 +1457,36 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 ```yaml
 ---
 - name: Install containerd
-  apt:
+  ansible.builtin.apt:
     name: containerd
     state: present
 
 - name: Create the containerd config directory
-  file:
+  ansible.builtin.file:
     path: /etc/containerd
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Generate the default containerd config
-  shell: containerd config default > /etc/containerd/config.toml
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
   args:
     creates: /etc/containerd/config.toml
 
 - name: Configure containerd to use the systemd cgroup driver
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/containerd/config.toml
-    regexp: 'SystemdCgroup = false'
-    line: '            SystemdCgroup = true'
-  notify: restart containerd
+    regexp: "SystemdCgroup = false"
+    line: "            SystemdCgroup = true"
+  notify: Restart containerd
 
 - name: Start the containerd service
-  systemd:
+  ansible.builtin.systemd:
     name: containerd
     state: started
     enabled: true
 ```
 
-- `notify: restart containerd` — if `lineinfile` changes the cgroup setting, the handler queues a restart; on re-runs where the line is already correct, the task reports `ok` and the handler is never queued — see [handlers](#handlers)
+- `notify: Restart containerd` — if `lineinfile` changes the cgroup setting, the handler queues a restart; on re-runs where the line is already correct, the task reports `ok` and the handler is never queued — see [handlers](#handlers)
 - `creates: /etc/containerd/config.toml` — only generate the default config once; on re-runs `lineinfile` checks whether the cgroup line is already correct without regenerating the whole file
 
 #### init.yml
@@ -1483,7 +1494,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 ```yaml
 ---
 - name: Initialize the kubeadm cluster
-  shell: >
+  ansible.builtin.shell: >
     kubeadm init
     --apiserver-advertise-address={{ ansible_default_ipv4.address }}
     --apiserver-cert-extra-sans={{ ansible_host }}
@@ -1493,32 +1504,32 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
     creates: /etc/kubernetes/admin.conf
 
 - name: Wait for etcd to be ready
-  wait_for:
+  ansible.builtin.wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: 2379
     delay: 10
     timeout: 120
 
 - name: Wait for the API server to be ready
-  wait_for:
+  ansible.builtin.wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: 6443
     delay: 30
     timeout: 180
 
 - name: Create the .kube directory
-  file:
+  ansible.builtin.file:
     path: /home/{{ kubeadm_user }}/.kube
     state: directory
     owner: "{{ kubeadm_user }}"
-    mode: '0755'
+    mode: "0755"
 
 - name: Copy kubeconfig
-  copy:
+  ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
     dest: /home/{{ kubeadm_user }}/.kube/config
     owner: "{{ kubeadm_user }}"
-    mode: '0600'
+    mode: "0600"
     remote_src: true
 ```
 
@@ -1530,32 +1541,34 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 ```yaml
 ---
 - name: Download the flannel manifest
-  get_url:
+  ansible.builtin.get_url:
     url: https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
     dest: /tmp/kube-flannel.yml
-    mode: '0644'
+    mode: "0644"
 
 - name: Pin flannel to the chosen network interface
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /tmp/kube-flannel.yml
-    insertafter: '- --kube-subnet-mgr'
+    insertafter: "- --kube-subnet-mgr"
     regexp: '^\s*- --iface='
-    line: '        - --iface={{ flannel_iface }}'
+    line: "        - --iface={{ flannel_iface }}"
 
 - name: Deploy flannel
-  command: kubectl apply -f /tmp/kube-flannel.yml
+  ansible.builtin.command: kubectl apply -f /tmp/kube-flannel.yml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
+  register: flannel_apply
+  changed_when: "'created' in flannel_apply.stdout or 'configured' in flannel_apply.stdout"
 
 - name: Query node status
-  command: kubectl get nodes
+  ansible.builtin.command: kubectl get nodes
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   register: kubeadm_nodes
   changed_when: false
 
 - name: Print node status
-  debug:
+  ansible.builtin.debug:
     msg: "{{ kubeadm_nodes.stdout_lines }}"
 ```
 
@@ -1567,22 +1580,22 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 ```yaml
 ---
 - name: Run kubeadm reset
-  command: kubeadm reset -f --cri-socket=unix:///var/run/containerd/containerd.sock
+  ansible.builtin.command: kubeadm reset -f --cri-socket=unix:///var/run/containerd/containerd.sock
   args:
     removes: /etc/kubernetes/admin.conf
 
 - name: Remove kubeconfig
-  file:
+  ansible.builtin.file:
     path: /home/{{ kubeadm_user }}/.kube/config
     state: absent
 
 - name: Remove the CNI config
-  file:
+  ansible.builtin.file:
     path: /etc/cni/net.d
     state: absent
 
 - name: Unhold the versions to allow removal
-  dpkg_selections:
+  ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: install
   loop:
@@ -1591,7 +1604,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
     - kubectl
 
 - name: Remove kubelet kubeadm kubectl
-  apt:
+  ansible.builtin.apt:
     name:
       - kubelet
       - kubeadm
@@ -1599,22 +1612,22 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
     state: absent
 
 - name: Remove the Kubernetes apt repository
-  file:
+  ansible.builtin.file:
     path: /etc/apt/sources.list.d/kubernetes.list
     state: absent
 
 - name: Remove the Kubernetes apt key
-  file:
+  ansible.builtin.file:
     path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     state: absent
 
 - name: Confirm the cluster config is removed
-  stat:
+  ansible.builtin.stat:
     path: /etc/kubernetes/admin.conf
   register: kubeadm_admin_conf
 
 - name: Print the uninstall result
-  debug:
+  ansible.builtin.debug:
     msg: "{{ 'kubeadm uninstalled successfully' if not kubeadm_admin_conf.stat.exists else 'kubeadm is still present, uninstall failed' }}"
 ```
 
@@ -1626,12 +1639,12 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 
 ```yaml
 ---
-- name: restart containerd
+- name: Restart containerd
   systemd:
     name: containerd
     state: restarted
 
-- name: restart kubelet
+- name: Restart kubelet
   systemd:
     name: kubelet
     state: restarted
@@ -1825,7 +1838,7 @@ Contributions and corrections are welcome.
 
 1. Fork the repo and create a branch: `git checkout -b improve-xyz`.
 2. Keep changes focused; match the existing style (English, bold-keyword bullet lists).
-3. Run a syntax check before opening a PR: `ansible-playbook --syntax-check ansible/playbooks/<playbook>.yml`.
+3. Run `ansible-lint` from the repo root before opening a PR — it must pass with no failures (CI runs the same check via [`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Lint rules are configured in [`.ansible-lint`](.ansible-lint) and [`.yamllint`](.yamllint).
 4. Open a pull request describing what changed and why.
 
 Found a typo or unclear explanation? Open an issue — small fixes help every future reader.

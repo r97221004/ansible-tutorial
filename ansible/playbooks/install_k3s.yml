@@ -3,6 +3,6 @@
 # Usage: ansible-playbook playbooks/install_k3s.yml
 - name: Install K3s cluster
   hosts: control
-  become: true                     # install / systemd / reading /etc/rancher all need root
+  become: true # install / systemd / reading /etc/rancher all need root
   roles:
     - k3s

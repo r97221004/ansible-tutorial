@@ -1,0 +1,30 @@
+---
+# ansible-lint configuration
+# Run from the repo root:  ansible-lint
+# Docs: https://ansible.readthedocs.io/projects/lint/
+
+profile: production
+
+exclude_paths:
+  - .git/
+  - .github/
+  # Encrypted Vault file can't be decrypted during lint; skip it to avoid
+  # the harmless "Decryption failed" warnings.
+  - ansible/inventory/group_vars/control/vault.yml
+
+# Rules intentionally skipped because they conflict with this repo's teaching
+# goals, not because the code is wrong. Each is explained in the README.
+skip_list:
+  # `curl -sfL https://get.k3s.io | sh -` is the central k3s teaching example
+  # (see "command vs shell vs script" and "Idempotency"); rewriting it as
+  # get_url would defeat the lesson.
+  - command-instead-of-module
+  - risky-shell-pipe
+  # `ignore_errors:` is deliberately demonstrated in the "Error Handling" section.
+  - ignore-errors
+  # Variables like `k9s_version` / `flannel_iface` read better unprefixed and are
+  # referenced throughout the README; the no-role-prefix convention is opinionated.
+  - var-naming[no-role-prefix]
+  # `when: <result>.changed` is taught in the "when" section as an alternative to
+  # handlers; converting it would change the teaching narrative.
+  - no-handler

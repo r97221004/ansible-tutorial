@@ -1,6 +1,6 @@
 ---
 - name: Initialize the kubeadm cluster
-  shell: >
+  ansible.builtin.shell: >
     kubeadm init
     --apiserver-advertise-address={{ ansible_default_ipv4.address }}
     --apiserver-cert-extra-sans={{ ansible_host }}
@@ -10,30 +10,30 @@
     creates: /etc/kubernetes/admin.conf
 
 - name: Wait for etcd to be ready
-  wait_for:
+  ansible.builtin.wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: 2379
     delay: 10
     timeout: 120
 
 - name: Wait for the API server to be ready
-  wait_for:
+  ansible.builtin.wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: 6443
     delay: 30
     timeout: 180
 
 - name: Create the .kube directory
-  file:
+  ansible.builtin.file:
     path: /home/{{ kubeadm_user }}/.kube
     state: directory
     owner: "{{ kubeadm_user }}"
-    mode: '0755'
+    mode: "0755"
 
 - name: Copy kubeconfig
-  copy:
+  ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
     dest: /home/{{ kubeadm_user }}/.kube/config
     owner: "{{ kubeadm_user }}"
-    mode: '0600'
+    mode: "0600"
     remote_src: true

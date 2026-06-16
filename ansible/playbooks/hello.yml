@@ -3,9 +3,9 @@
   hosts: control
   tasks:
     - name: Print message
-      debug:
+      ansible.builtin.debug:
         msg: "Ansible is working! This machine is {{ ansible_hostname }}"
 
     - name: Check OS
-      debug:
+      ansible.builtin.debug:
         msg: "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"

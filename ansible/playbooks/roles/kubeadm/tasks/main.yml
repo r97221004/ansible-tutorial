@@ -1,6 +1,8 @@
 ---
-- include_tasks: install.yml
+- name: Install kubeadm cluster
+  ansible.builtin.include_tasks: install.yml
   when: kubeadm_state == "present"
 
-- include_tasks: uninstall.yml
+- name: Uninstall kubeadm cluster
+  ansible.builtin.include_tasks: uninstall.yml
   when: kubeadm_state == "absent"

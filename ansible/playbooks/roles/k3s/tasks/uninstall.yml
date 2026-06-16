@@ -2,7 +2,7 @@
 - name: Run the k3s uninstall script
   ansible.builtin.command: /usr/local/bin/k3s-uninstall.sh
   args:
-    removes: /usr/local/bin/k3s    # skip if the binary is already gone
+    removes: /usr/local/bin/k3s # skip if the binary is already gone
 
 - name: Remove k3s config and data directories
   ansible.builtin.file:

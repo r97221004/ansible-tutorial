@@ -3,10 +3,10 @@
   ansible.builtin.get_url:
     url: "{{ k9s_url }}"
     dest: /tmp/k9s.tar.gz
-    mode: '0644'
-    timeout: 120                   # ~40MB file, give it extra time
+    mode: "0644"
+    timeout: 120 # ~40MB file, give it extra time
   register: k9s_download
-  retries: 3                       # retry up to 3 times on network blips
+  retries: 3 # retry up to 3 times on network blips
   delay: 5
   until: k9s_download is succeeded
 
@@ -17,11 +17,11 @@
     remote_src: true
 
 - name: Install the k9s binary
-  become: true                     # only writing to /usr/local/bin needs root
+  become: true # only writing to /usr/local/bin needs root
   ansible.builtin.copy:
     src: /tmp/k9s
     dest: "{{ k9s_bin_dir }}/k9s"
-    mode: '0755'
+    mode: "0755"
     remote_src: true
 
 - name: Check the k9s version

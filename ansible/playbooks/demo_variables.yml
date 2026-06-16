@@ -4,15 +4,15 @@
   become: true
   tasks:
     - name: Install packages from group_vars
-      apt:
+      ansible.builtin.apt:
         name: "{{ demo_packages }}"
         state: present
         update_cache: true
 
     - name: Show host_vars message
-      debug:
+      ansible.builtin.debug:
         msg: "{{ demo_motd_message }}"
 
     - name: Confirm ansible_become_pass was loaded from Vault
-      debug:
+      ansible.builtin.debug:
         msg: "ansible_become_pass is defined: {{ ansible_become_pass is defined }}"
