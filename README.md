@@ -4,8 +4,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Ubuntu%2022.04-E95420?logo=ubuntu&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Lab-k3s%20%7C%20kubeadm-326CE5?logo=kubernetes&logoColor=white)
 [![License: MIT](https://img.shields.io/github/license/r97221004/ansible-tutorial?color=green)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/r97221004/ansible-tutorial?style=social)](https://github.com/r97221004/ansible-tutorial/stargazers)
-[![Last commit](https://img.shields.io/github/last-commit/r97221004/ansible-tutorial)](https://github.com/r97221004/ansible-tutorial/commits)
+[![Stars](https://img.shields.io/github/stars/r97221004/ansible-tutorial?style=social&cacheSeconds=86400)](https://github.com/r97221004/ansible-tutorial/stargazers)
 
 > **Problem**: Manually SSH-ing into multiple machines to install packages, copy configs, and start services is slow, repetitive, and easy to get inconsistent.
 >
@@ -120,27 +119,31 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 
 ```mermaid
 flowchart LR
-    subgraph control["💻 Control machine (your laptop)"]
+    subgraph control["�️&nbsp; Control machine — your laptop"]
         direction TB
-        cli["ansible-playbook"]
-        assets["inventory + playbooks + roles"]
-        cli --- assets
+        inv["📋 inventory<br/><sub>which hosts + vars</sub>"]
+        pb["📜 playbooks<br/><sub>install / uninstall</sub>"]
+        roles["📦 roles<br/><sub>k3s · kubeadm · kube_tools</sub>"]
+        inv --> pb --> roles
     end
 
-    subgraph target["☁️ Target VM — [control] group · Ubuntu 22.04"]
+    subgraph target["☁️&nbsp; Target VM — Ubuntu 22.04 · [control] group"]
         direction TB
-        k8s["k3s &nbsp;OR&nbsp; kubeadm cluster"]
-        k9s["k9s (cluster TUI)"]
+        cluster["☸️ Single-node Kubernetes<br/><sub>k3s OR kubeadm</sub>"]
+        k9s["🐶 k9s<br/><sub>cluster TUI</sub>"]
+        cluster -.->|inspect| k9s
     end
 
-    control -- "SSH · tasks run as root" --> target
+    control ===>|"SSH · tasks run as root"| target
 
-    classDef box fill:#1f6feb22,stroke:#1f6feb,stroke-width:1px,color:#c9d1d9;
-    class control,target box;
+    classDef ctrl fill:#1f6feb1a,stroke:#1f6feb,stroke-width:1.5px,color:#c9d1d9,rx:6,ry:6;
+    classDef tgt fill:#2386361a,stroke:#238636,stroke-width:1.5px,color:#c9d1d9,rx:6,ry:6;
+    class control ctrl;
+    class target tgt;
 ```
 
 - You run `ansible-playbook` on the **control machine**; nothing is installed there.
-- Ansible connects over **SSH** and applies tasks on the **target VM**, which becomes a single-node Kubernetes control node.
+- The **inventory → playbooks → roles** chain is all Ansible reads — then it connects over **SSH** and applies the tasks on the **target VM**, which becomes a single-node Kubernetes control node.
 - The same playbook works for one VM or many — you only change the inventory.
 
 ## Repository Map
