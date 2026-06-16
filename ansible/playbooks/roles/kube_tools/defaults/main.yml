@@ -1,16 +1,16 @@
 ---
-# kube_tools role 的預設變數，可在 inventory 或 playbook 覆寫
+# Default variables for the kube_tools role; override in inventory or the playbook
 
-# present = 安裝，absent = 解除安裝
+# present = install, absent = uninstall
 kube_tools_state: present
 
-# k9s 版本：latest 取最新發行，或指定如 v0.32.5 做版本鎖定
+# k9s version: latest grabs the newest release, or pin one like v0.32.5
 k9s_version: latest
 
-# binary 安裝位置
+# binary install location
 k9s_bin_dir: /usr/local/bin
 
-# 依版本組出下載網址（latest 用 /latest/download，指定版本用 /download/<tag>）
+# Build the download URL from the version (latest uses /latest/download, pinned uses /download/<tag>)
 k9s_url: >-
   {{
     'https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz'

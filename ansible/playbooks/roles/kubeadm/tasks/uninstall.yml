@@ -1,20 +1,20 @@
 ---
-- name: 執行 kubeadm reset
+- name: Run kubeadm reset
   command: kubeadm reset -f --cri-socket=unix:///var/run/containerd/containerd.sock
   args:
     removes: /etc/kubernetes/admin.conf
 
-- name: 移除 kubeconfig
+- name: Remove kubeconfig
   file:
-    path: /home/{{ ansible_user }}/.kube/config
+    path: /home/{{ kubeadm_user }}/.kube/config
     state: absent
 
-- name: 移除 CNI 設定
+- name: Remove the CNI config
   file:
     path: /etc/cni/net.d
     state: absent
 
-- name: 解除版本鎖定，允許移除
+- name: Unhold the versions to allow removal
   dpkg_selections:
     name: "{{ item }}"
     selection: install
@@ -23,7 +23,7 @@
     - kubeadm
     - kubectl
 
-- name: 移除 kubelet kubeadm kubectl
+- name: Remove kubelet kubeadm kubectl
   apt:
     name:
       - kubelet
@@ -31,12 +31,21 @@
       - kubectl
     state: absent
 
-- name: 移除 Kubernetes apt repository
+- name: Remove the Kubernetes apt repository
   file:
     path: /etc/apt/sources.list.d/kubernetes.list
     state: absent
 
-- name: 移除 Kubernetes apt key
+- name: Remove the Kubernetes apt key
   file:
     path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     state: absent
+
+- name: Confirm the cluster config is removed
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_admin_conf
+
+- name: Print the uninstall result
+  debug:
+    msg: "{{ 'kubeadm uninstalled successfully' if not kubeadm_admin_conf.stat.exists else 'kubeadm is still present, uninstall failed' }}"

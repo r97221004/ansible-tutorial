@@ -2,10 +2,10 @@
 - name: Hello World
   hosts: control
   tasks:
-    - name: 印出訊息
+    - name: Print message
       debug:
-        msg: "Ansible 可以動了！這台機器是 {{ ansible_hostname }}"
+        msg: "Ansible is working! This machine is {{ ansible_hostname }}"
 
-    - name: 確認作業系統
+    - name: Check OS
       debug:
         msg: "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"

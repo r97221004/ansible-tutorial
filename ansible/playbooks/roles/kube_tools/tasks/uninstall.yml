@@ -1,6 +1,15 @@
 ---
-- name: 移除 k9s binary
+- name: Remove the k9s binary
   become: true
   ansible.builtin.file:
     path: "{{ k9s_bin_dir }}/k9s"
     state: absent
+
+- name: Confirm the k9s binary is removed
+  ansible.builtin.stat:
+    path: "{{ k9s_bin_dir }}/k9s"
+  register: k9s_binary
+
+- name: Print the uninstall result
+  ansible.builtin.debug:
+    msg: "{{ 'k9s uninstalled successfully' if not k9s_binary.stat.exists else 'k9s is still present, uninstall failed' }}"

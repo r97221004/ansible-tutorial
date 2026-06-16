@@ -1,8 +1,8 @@
 ---
-# 在 control 群組安裝 K3s 叢集
-# 用法：ansible-playbook playbooks/install_k3s.yml
-- name: 安裝 K3s 叢集
+# Install a K3s cluster on the control group
+# Usage: ansible-playbook playbooks/install_k3s.yml
+- name: Install K3s cluster
   hosts: control
-  become: true                     # k3s 安裝 / systemd / 讀 /etc/rancher 都需要 root
+  become: true                     # install / systemd / reading /etc/rancher all need root
   roles:
     - k3s

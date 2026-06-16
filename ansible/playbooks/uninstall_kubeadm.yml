@@ -1,5 +1,5 @@
 ---
-- name: 解除安裝 kubeadm cluster
+- name: Uninstall kubeadm cluster
   hosts: control
   become: true
   roles:

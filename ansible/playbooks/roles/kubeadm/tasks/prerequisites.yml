@@ -1,5 +1,5 @@
 ---
-- name: 設定開機自動載入核心模組 (overlay, br_netfilter)
+- name: Configure kernel modules to load on boot (overlay, br_netfilter)
   copy:
     dest: /etc/modules-load.d/k8s.conf
     content: |
@@ -7,14 +7,14 @@
       br_netfilter
     mode: '0644'
 
-- name: 立即載入 overlay 與 br_netfilter 核心模組
+- name: Load the overlay and br_netfilter kernel modules now
   command: modprobe {{ item }}
   loop:
     - overlay
     - br_netfilter
   changed_when: false
 
-- name: 設定 Kubernetes 所需 sysctl 參數
+- name: Set the sysctl parameters required by Kubernetes
   copy:
     dest: /etc/sysctl.d/k8s.conf
     content: |
@@ -24,16 +24,16 @@
     mode: '0644'
   register: k8s_sysctl
 
-- name: 套用 sysctl 設定
+- name: Apply the sysctl settings
   command: sysctl --system
   when: k8s_sysctl.changed
 
-- name: 更新 apt cache
+- name: Update the apt cache
   apt:
     update_cache: true
   ignore_errors: true
 
-- name: 安裝前置套件
+- name: Install prerequisite packages
   apt:
     name:
       - apt-transport-https
@@ -42,26 +42,26 @@
       - gpg
     state: present
 
-- name: 建立 keyrings 目錄
+- name: Create the keyrings directory
   file:
     path: /etc/apt/keyrings
     state: directory
     mode: '0755'
 
-- name: 下載 Kubernetes apt key
+- name: Download the Kubernetes apt key
   shell: |
     curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | \
     gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
   args:
     creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
-- name: 加入 Kubernetes apt repository
+- name: Add the Kubernetes apt repository
   lineinfile:
     path: /etc/apt/sources.list.d/kubernetes.list
     line: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /"
     create: true
 
-- name: 安裝 kubelet kubeadm kubectl
+- name: Install kubelet kubeadm kubectl
   apt:
     name:
       - kubelet
@@ -70,7 +70,7 @@
     state: present
     update_cache: true
 
-- name: 鎖定版本，避免自動升級
+- name: Hold the versions to prevent automatic upgrades
   dpkg_selections:
     name: "{{ item }}"
     selection: hold

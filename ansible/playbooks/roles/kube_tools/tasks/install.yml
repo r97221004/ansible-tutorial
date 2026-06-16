@@ -1,34 +1,34 @@
 ---
-- name: 下載 k9s
+- name: Download k9s
   ansible.builtin.get_url:
     url: "{{ k9s_url }}"
     dest: /tmp/k9s.tar.gz
     mode: '0644'
-    timeout: 120                   # 檔案約 40MB，放寬逾時
+    timeout: 120                   # ~40MB file, give it extra time
   register: k9s_download
-  retries: 3                       # 網路抖動時最多重試 3 次
+  retries: 3                       # retry up to 3 times on network blips
   delay: 5
   until: k9s_download is succeeded
 
-- name: 解壓縮 k9s
+- name: Extract k9s
   ansible.builtin.unarchive:
     src: /tmp/k9s.tar.gz
     dest: /tmp/
     remote_src: true
 
-- name: 安裝 k9s binary
-  become: true                     # 只有寫入 /usr/local/bin 需要 root
+- name: Install the k9s binary
+  become: true                     # only writing to /usr/local/bin needs root
   ansible.builtin.copy:
     src: /tmp/k9s
     dest: "{{ k9s_bin_dir }}/k9s"
     mode: '0755'
     remote_src: true
 
-- name: 確認 k9s 版本
+- name: Check the k9s version
   ansible.builtin.command: k9s version
   register: k9s_check
   changed_when: false
 
-- name: 印出 k9s 版本
+- name: Print the k9s version
   ansible.builtin.debug:
     msg: "{{ k9s_check.stdout_lines }}"

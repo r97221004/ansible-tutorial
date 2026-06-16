@@ -1,9 +1,9 @@
 ---
-# 依 kube_tools_state 決定要安裝還是解除安裝
-- name: 安裝 kube 工具
+# Dispatch to install or uninstall based on kube_tools_state
+- name: Install kube tools
   ansible.builtin.include_tasks: install.yml
   when: kube_tools_state == "present"
 
-- name: 解除安裝 kube 工具
+- name: Uninstall kube tools
   ansible.builtin.include_tasks: uninstall.yml
   when: kube_tools_state == "absent"

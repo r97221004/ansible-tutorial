@@ -1,5 +1,5 @@
 ---
-- name: 安裝 kubeadm cluster
+- name: Install kubeadm cluster
   hosts: control
   become: true
   roles:

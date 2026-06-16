@@ -1,7 +1,7 @@
 ---
-# 解除安裝 K3s 叢集（不動 k9s，要移除工具請跑 uninstall_kube_tools.yml）
-# 用法：ansible-playbook playbooks/uninstall_k3s.yml
-- name: 解除安裝 K3s 叢集
+# Uninstall the K3s cluster (leaves k9s in place; run uninstall_kube_tools.yml to remove tooling)
+# Usage: ansible-playbook playbooks/uninstall_k3s.yml
+- name: Uninstall K3s cluster
   hosts: control
   become: true
   roles:

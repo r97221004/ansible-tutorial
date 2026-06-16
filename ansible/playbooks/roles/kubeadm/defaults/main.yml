@@ -1,5 +1,9 @@
 ---
-# present = 安裝，absent = 解除安裝
+# present = install, absent = uninstall
 kubeadm_state: present
 
+# Which regular user should own kubeconfig (defaults to the connecting ansible_user)
+kubeadm_user: "{{ ansible_user }}"
+
+# Network interface flannel should advertise on
 flannel_iface: "eth0"

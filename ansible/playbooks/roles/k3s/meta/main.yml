@@ -1,7 +1,8 @@
 ---
 galaxy_info:
   role_name: k3s
-  description: 安裝 / 解除安裝 K3s 單節點叢集，並佈署 kubeconfig
+  author: Matt2_Chang
+  description: Install / uninstall a single-node K3s cluster and deploy kubeconfig
   license: MIT
   min_ansible_version: "2.14"
 dependencies: []
