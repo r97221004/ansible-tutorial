@@ -1,0 +1,30 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check k9s binary exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/k9s
+      register: k9s_bin
+
+    - name: Assert k9s is installed
+      ansible.builtin.assert:
+        that: k9s_bin.stat.exists
+        fail_msg: "k9s binary not found at /usr/local/bin/k9s"
+        success_msg: "k9s binary is present"
+
+    - name: Check k9s is executable
+      ansible.builtin.assert:
+        that: k9s_bin.stat.executable
+        fail_msg: "k9s is not executable"
+        success_msg: "k9s is executable"
+
+    - name: Run k9s version
+      ansible.builtin.command: /usr/local/bin/k9s version
+      changed_when: false
+      register: k9s_version_output
+
+    - name: Print k9s version
+      ansible.builtin.debug:
+        msg: "{{ k9s_version_output.stdout_lines }}"

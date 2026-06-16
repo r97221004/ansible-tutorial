@@ -23,3 +23,21 @@ jobs:
 
       - name: Run ansible-lint
         run: ansible-lint
+
+  molecule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install molecule and docker driver
+        run: pip install molecule molecule-plugins[docker] ansible-core
+
+      - name: Run molecule test (kube_tools role)
+        run: molecule test
+        working-directory: ansible/playbooks/roles/kube_tools
