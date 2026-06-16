@@ -178,7 +178,7 @@ Check the version:
 
 ```bash
 ansible --version
-# ansible 2.10.8
+# ansible [core 2.14+]
 ```
 
 ---
@@ -882,7 +882,7 @@ ansible_become_pass: supersecret
 - `--vault-password-file <path>` → read the password from a file (the file itself should not be committed)
 
 ```bash
-ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/site.yml --ask-vault-pass
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/demo_variables.yml --ask-vault-pass
 ```
 
 ---
