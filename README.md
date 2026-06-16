@@ -76,6 +76,8 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 - [**Variables**](#variables)
 - [**when**](#when)
 - [**loop**](#loop)
+- [**handlers**](#handlers)
+- [**tags**](#tags)
 - [**Error Handling**](#error-handling)
 - [**Ansible Vault**](#ansible-vault)
 
@@ -799,6 +801,80 @@ For example, if `packages` is `[curl, git]` in `group_vars/control/vars.yml`, bu
 
 ---
 
+## handlers
+
+When a config file changes, the service that reads it should restart — but only if the file actually changed, and only once even if multiple tasks modify the config. Handlers solve this.
+
+- A task declares `notify: <handler name>` when it makes a change
+- Ansible queues the handler but does not run it immediately
+- After all tasks in the play finish, each notified handler runs exactly once
+
+```yaml
+tasks:
+  - name: Configure containerd to use the systemd cgroup driver
+    lineinfile:
+      path: /etc/containerd/config.toml
+      regexp: 'SystemdCgroup = false'
+      line: '            SystemdCgroup = true'
+    notify: restart containerd  # queued only if this task reports changed
+
+handlers:
+  - name: restart containerd
+    systemd:
+      name: containerd
+      state: restarted
+```
+
+- **Deferred** — the handler runs after all tasks, not at the `notify` line; this prevents unnecessary mid-play restarts
+- **Deduplicated** — if ten tasks notify the same handler, it still runs only once
+- **Conditional** — if the notifying task reports `ok` (nothing changed), the handler is never queued; no change, no restart
+- **Ordered** — multiple handlers run in declaration order, not the order they were notified
+
+> The kubeadm role uses this pattern in practice: `containerd.yml` notifies `restart containerd` from `handlers/main.yml` — see [kubeadm Role](#kubeadm-role).
+
+To force handlers to run mid-play instead of waiting until the end:
+
+```yaml
+- meta: flush_handlers
+```
+
+---
+
+## tags
+
+Tags let you run a subset of tasks from a playbook without modifying it or creating a separate playbook. The examples below are illustrative — the playbooks in this repo don't define tags.
+
+```yaml
+tasks:
+  - name: Install kubelet kubeadm kubectl
+    apt:
+      name: [kubelet, kubeadm, kubectl]
+      state: present
+    tags: install
+
+  - name: Query node status
+    command: kubectl get nodes
+    changed_when: false
+    tags: verify
+```
+
+```bash
+# Run only tasks tagged "verify"
+ansible-playbook <your-playbook>.yml --tags verify
+
+# Run everything except "verify"
+ansible-playbook <your-playbook>.yml --skip-tags verify
+
+# List all available tags without running anything
+ansible-playbook <your-playbook>.yml --list-tags
+```
+
+- A task can carry **multiple tags**: `tags: [install, k8s]`; `--tags "install,verify"` runs tasks matching either
+- `always` is a reserved tag — those tasks run on every invocation unless explicitly excluded with `--skip-tags always`
+- Tags also apply to roles: `roles: - { role: k3s, tags: k3s }`
+
+---
+
 ## Error Handling
 
 By default, if a task fails, Ansible stops the play on that host. These directives let you control that behavior.
@@ -1250,7 +1326,7 @@ The `kubeadm` role builds an **upstream Kubernetes** single-node control plane �
   when: kubeadm_state == "absent"
 ```
 
-**The install pipeline** (`install.yml` imports these in order):
+**The install pipeline** — `tasks/install.yml` calls these in order:
 
 ```
 prerequisites.yml → containerd.yml → init.yml → flannel.yml
@@ -1259,11 +1335,309 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 | Step                | What it does                                                                                                                                          |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `prerequisites.yml` | Loads kernel modules (`overlay`, `br_netfilter`), sets sysctl, adds the Kubernetes apt repo, installs and version-locks `kubelet`/`kubeadm`/`kubectl` |
-| `containerd.yml`    | Installs containerd and switches it to the **systemd cgroup driver** (required by kubelet)                                                            |
+| `containerd.yml`    | Installs containerd, switches it to the **systemd cgroup driver** (required by kubelet), restarts it via a handler                                    |
 | `init.yml`          | Runs `kubeadm init`, waits for etcd/API server, then copies kubeconfig to the user                                                                    |
 | `flannel.yml`       | Deploys the **flannel** CNI so pods can network and the node turns `Ready`                                                                            |
 
-> The order matters: the runtime and kernel settings must exist before `kubeadm init`, and the cluster must be initialized before a CNI can be applied. This is why the role uses `import_tasks` (a fixed, ordered sequence) rather than separate playbooks.
+> The order matters: the runtime and kernel settings must exist before `kubeadm init`, and the cluster must be initialized before a CNI can be applied. `import_tasks` (unlike `include_tasks`) is processed **statically at parse time** — Ansible validates the full sequence before running anything and tasks run in a fixed, guaranteed order.
+
+**tasks/install.yml**
+
+```yaml
+---
+- import_tasks: prerequisites.yml
+- import_tasks: containerd.yml
+- import_tasks: init.yml
+- import_tasks: flannel.yml
+```
+
+#### prerequisites.yml
+
+```yaml
+---
+- name: Configure kernel modules to load on boot (overlay, br_netfilter)
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: '0644'
+
+- name: Load the overlay and br_netfilter kernel modules now
+  command: modprobe {{ item }}
+  loop:
+    - overlay
+    - br_netfilter
+  changed_when: false
+
+- name: Set the sysctl parameters required by Kubernetes
+  copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward = 1
+    mode: '0644'
+  register: k8s_sysctl
+
+- name: Apply the sysctl settings
+  command: sysctl --system
+  when: k8s_sysctl.changed
+
+- name: Update the apt cache
+  apt:
+    update_cache: true
+  ignore_errors: true
+
+- name: Install prerequisite packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gpg
+    state: present
+
+- name: Create the keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download the Kubernetes apt key
+  shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | \
+    gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Add the Kubernetes apt repository
+  lineinfile:
+    path: /etc/apt/sources.list.d/kubernetes.list
+    line: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /"
+    create: true
+
+- name: Install kubelet kubeadm kubectl
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+    update_cache: true
+
+- name: Hold the versions to prevent automatic upgrades
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+```
+
+- `modprobe` with `changed_when: false` — loading a module that's already loaded is a no-op but still exits 0, so Ansible can't detect "change"; mark it explicitly
+- `register: k8s_sysctl` + `when: k8s_sysctl.changed` — only re-apply sysctl if the config file was actually written; re-running `sysctl --system` on every play would be noise
+- `creates:` on the apt key download — re-running the curl-pipe-gpg command on a key that's already there would error; skip it once the file exists
+- `dpkg_selections: selection: hold` — pins the versions so `apt upgrade` won't accidentally upgrade kubelet mid-cluster
+
+#### containerd.yml
+
+```yaml
+---
+- name: Install containerd
+  apt:
+    name: containerd
+    state: present
+
+- name: Create the containerd config directory
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+
+- name: Generate the default containerd config
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+
+- name: Configure containerd to use the systemd cgroup driver
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    line: '            SystemdCgroup = true'
+  notify: restart containerd
+
+- name: Start the containerd service
+  systemd:
+    name: containerd
+    state: started
+    enabled: true
+```
+
+- `notify: restart containerd` — if `lineinfile` changes the cgroup setting, the handler queues a restart; on re-runs where the line is already correct, the task reports `ok` and the handler is never queued — see [handlers](#handlers)
+- `creates: /etc/containerd/config.toml` — only generate the default config once; on re-runs `lineinfile` checks whether the cgroup line is already correct without regenerating the whole file
+
+#### init.yml
+
+```yaml
+---
+- name: Initialize the kubeadm cluster
+  shell: >
+    kubeadm init
+    --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+    --apiserver-cert-extra-sans={{ ansible_host }}
+    --pod-network-cidr=10.244.0.0/16
+    --cri-socket=unix:///var/run/containerd/containerd.sock
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Wait for etcd to be ready
+  wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: 2379
+    delay: 10
+    timeout: 120
+
+- name: Wait for the API server to be ready
+  wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: 6443
+    delay: 30
+    timeout: 180
+
+- name: Create the .kube directory
+  file:
+    path: /home/{{ kubeadm_user }}/.kube
+    state: directory
+    owner: "{{ kubeadm_user }}"
+    mode: '0755'
+
+- name: Copy kubeconfig
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/{{ kubeadm_user }}/.kube/config
+    owner: "{{ kubeadm_user }}"
+    mode: '0600'
+    remote_src: true
+```
+
+- `creates: /etc/kubernetes/admin.conf` — `kubeadm init` on an already-initialized node would error; skip it once the admin config exists
+- `wait_for: port: 2379 / 6443` — etcd and the API server take several seconds to come up after init; `flannel.yml` needs the API server reachable before it can `kubectl apply`
+
+#### flannel.yml
+
+```yaml
+---
+- name: Download the flannel manifest
+  get_url:
+    url: https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+    dest: /tmp/kube-flannel.yml
+    mode: '0644'
+
+- name: Pin flannel to the chosen network interface
+  lineinfile:
+    path: /tmp/kube-flannel.yml
+    insertafter: '- --kube-subnet-mgr'
+    regexp: '^\s*- --iface='
+    line: '        - --iface={{ flannel_iface }}'
+
+- name: Deploy flannel
+  command: kubectl apply -f /tmp/kube-flannel.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: Query node status
+  command: kubectl get nodes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: kubeadm_nodes
+  changed_when: false
+
+- name: Print node status
+  debug:
+    msg: "{{ kubeadm_nodes.stdout_lines }}"
+```
+
+- `lineinfile: regexp: / line:` — idempotent patch: if `--iface=eth0` is already in the manifest it replaces it; if not, it inserts after `--kube-subnet-mgr`; re-running produces the same result
+- `environment: KUBECONFIG:` — root doesn't have `~/.kube/config` at this point; setting `KUBECONFIG` inline targets the admin config without permanently copying it
+
+#### Uninstall — tasks/uninstall.yml
+
+```yaml
+---
+- name: Run kubeadm reset
+  command: kubeadm reset -f --cri-socket=unix:///var/run/containerd/containerd.sock
+  args:
+    removes: /etc/kubernetes/admin.conf
+
+- name: Remove kubeconfig
+  file:
+    path: /home/{{ kubeadm_user }}/.kube/config
+    state: absent
+
+- name: Remove the CNI config
+  file:
+    path: /etc/cni/net.d
+    state: absent
+
+- name: Unhold the versions to allow removal
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Remove kubelet kubeadm kubectl
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: absent
+
+- name: Remove the Kubernetes apt repository
+  file:
+    path: /etc/apt/sources.list.d/kubernetes.list
+    state: absent
+
+- name: Remove the Kubernetes apt key
+  file:
+    path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    state: absent
+
+- name: Confirm the cluster config is removed
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_admin_conf
+
+- name: Print the uninstall result
+  debug:
+    msg: "{{ 'kubeadm uninstalled successfully' if not kubeadm_admin_conf.stat.exists else 'kubeadm is still present, uninstall failed' }}"
+```
+
+- `removes: /etc/kubernetes/admin.conf` — `kubeadm reset` on an already-clean node would error; `removes:` skips it if the cluster is already gone
+- unhold before removal — `apt remove` fails on held packages; `dpkg_selections: selection: install` releases the hold first
+- removes the apt repo and key — so a future `apt update` doesn't try to reach a repo that's no longer needed
+
+**handlers/main.yml**
+
+```yaml
+---
+- name: restart containerd
+  systemd:
+    name: containerd
+    state: restarted
+
+- name: restart kubelet
+  systemd:
+    name: kubelet
+    state: restarted
+```
+
+The handler name must exactly match the string passed to `notify:` in the task files. Both handlers run at the end of the play — not at the point where `notify:` appears — and only if their notifying task reported `changed`.
 
 **roles/kubeadm/defaults/main.yml**
 
