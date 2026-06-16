@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Ubuntu%2022.04-E95420?logo=ubuntu&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Lab-k3s%20%7C%20kubeadm-326CE5?logo=kubernetes&logoColor=white)
 [![License: MIT](https://img.shields.io/github/license/r97221004/ansible-tutorial?color=green)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/r97221004/ansible-tutorial?style=social&cacheSeconds=86400)](https://github.com/r97221004/ansible-tutorial/stargazers)
+[![Stars](https://img.shields.io/badge/Stars-1-blue?logo=github&style=social)](https://github.com/r97221004/ansible-tutorial/stargazers)
 
 > **Problem**: Manually SSH-ing into multiple machines to install packages, copy configs, and start services is slow, repetitive, and easy to get inconsistent.
 >
