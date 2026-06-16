@@ -1169,9 +1169,18 @@ k9s_url: >-
   ansible.builtin.file:
     path: "{{ k9s_bin_dir }}/k9s"
     state: absent
+
+- name: Confirm the k9s binary is removed
+  ansible.builtin.stat:
+    path: "{{ k9s_bin_dir }}/k9s"
+  register: k9s_binary
+
+- name: Print the uninstall result
+  ansible.builtin.debug:
+    msg: "{{ 'k9s uninstalled successfully' if not k9s_binary.stat.exists else 'k9s is still present, uninstall failed' }}"
 ```
 
-- k9s is just a standalone binary — no systemd service, config file, or data directory — so uninstalling is just deleting this one file, much simpler than k3s's multi-step uninstall
+- k9s is just a standalone binary — no systemd service, config file, or data directory — so removing it is a single `file: state: absent`; the closing `stat` + `debug` confirms it's gone, mirroring the k3s uninstall
 
 #### Run
 
@@ -1250,9 +1259,14 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 # present = install, absent = uninstall
 kubeadm_state: present
 
+# Which regular user should own kubeconfig (defaults to the connecting ansible_user)
+kubeadm_user: "{{ ansible_user }}"
+
 # Network interface flannel should advertise on
 flannel_iface: "eth0"
 ```
+
+> Like the k3s role, `kubeadm_user` lives in `defaults` rather than being hardcoded — so install and uninstall always target the same user even if you change the connecting account.
 
 #### Run
 
@@ -1274,6 +1288,8 @@ ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kube
 > First-time `kubeadm init` pulls several container images, so the install takes noticeably longer than k3s. Re-runs are idempotent — `creates:` on the `kubeadm init` step skips re-initializing an existing cluster.
 
 #### Verify
+
+The install run already prints node status at the end (the `flannel.yml` step runs `kubectl get nodes`), and the uninstall run prints whether `/etc/kubernetes/admin.conf` is gone — same confidence checks as the k3s role. You can re-check manually any time:
 
 ```bash
 kubectl get nodes              # node should reach Ready once flannel is up
