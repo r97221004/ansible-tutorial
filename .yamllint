@@ -12,7 +12,7 @@ rules:
   line-length: disable
   # Ansible truthy values like `true`/`false` are already consistent.
   truthy:
-    allowed-values: ['true', 'false']
+    allowed-values: ["true", "false"]
     check-keys: false
   # The following must match ansible-lint's internal requirements.
   braces:

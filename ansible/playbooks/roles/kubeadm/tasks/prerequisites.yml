@@ -61,7 +61,7 @@
     path: /etc/apt/sources.list.d/kubernetes.list
     line: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /"
     create: true
-    mode: '0644'
+    mode: "0644"
 
 - name: Install kubelet kubeadm kubectl
   ansible.builtin.apt:

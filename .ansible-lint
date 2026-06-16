@@ -11,6 +11,9 @@ exclude_paths:
   # Encrypted Vault file can't be decrypted during lint; skip it to avoid
   # the harmless "Decryption failed" warnings.
   - ansible/inventory/group_vars/control/vault.yml
+  # Molecule converge/verify playbooks are run inside Docker with a different
+  # roles path; linting them standalone always fails role resolution.
+  - ansible/playbooks/roles/kube_tools/molecule/
 
 # Rules intentionally skipped because they conflict with this repo's teaching
 # goals, not because the code is wrong. Each is explained in the README.

@@ -65,10 +65,11 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project-Specific Guidelines
 
-### README.md Style
+### Ansible Lint
 
-When adding new sections to `README.md` (the Ansible notes), follow the style established from [HcwXd/kubernetes-tutorial](https://github.com/HcwXd/kubernetes-tutorial):
+All Ansible files must pass `ansible-lint` at the **production** profile before committing.
 
-- Table of Contents entries: `- [**Title**](#anchor)` (bold bullet list, not a flat backslash-separated list)
-- Prefer nested bullet lists with **bold keywords** over long prose paragraphs
-- Anchors must follow GitLab's anchor rules (consecutive hyphens collapse to one), since this repo is hosted on GitLab — verify any heading containing punctuation (em-dash, slashes, etc.)
+- Use FQCN for all built-in modules (e.g. `ansible.builtin.copy`, not `copy`)
+- Every `command`/`shell` task must have `changed_when:`
+- Every task must have a `name:`
+- Run `ansible-lint` from the repo root to verify
