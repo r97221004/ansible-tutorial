@@ -15,9 +15,9 @@ A hands-on, example-driven Ansible refresher. Each concept is paired with a runn
 
 <!-- TODO: add a demo screenshot/GIF here for stronger first impression.
      Suggested: a k9s TUI shot or the install run. Save it under docs/images/
-     and uncomment the line below.
-![k9s inspecting the cluster](docs/images/k9s-demo.png)
--->
+     and uncomment the line below. -->
+
+![k9s inspecting the cluster](docs/images/k9s.png)
 
 > Best for readers who already know Ansible basics and want a fast, practical refresh (~20–40 min). New to Ansible? Read top to bottom. Just refreshing? Jump straight to the [Table of Contents](#table-of-contents).
 
