@@ -309,7 +309,7 @@ This generates two files:
 
 **Get the VM's public IP**
 
-On the VM page in the Azure Portal, find the "Public IP address", e.g. `40.81.188.168`.
+On the VM page in the Azure Portal, find the "Public IP address", e.g. `203.0.113.10`.
 
 **Open port 22 (NSG rule)**
 
@@ -321,7 +321,7 @@ allowing TCP 22 from your source, otherwise SSH won't be able to connect.
 **Copy the public key to the Azure VM**
 
 ```bash
-ssh-copy-id matt2_chang@40.81.188.168
+ssh-copy-id <YOUR_USER>@<YOUR_VM_IP>
 # password required the first time (or use the key downloaded when creating the Azure VM), then no password afterwards
 ```
 
@@ -330,7 +330,7 @@ ssh-copy-id matt2_chang@40.81.188.168
 Confirm you can connect:
 
 ```bash
-ssh matt2_chang@40.81.188.168
+ssh <YOUR_USER>@<YOUR_VM_IP>
 # connects without a password = success
 ```
 
@@ -340,14 +340,15 @@ The inventory used for the remote VM:
 
 ```ini
 [control]
-40.81.188.168 ansible_user=matt2_chang ansible_connection=ssh
+azure-vm ansible_host=<YOUR_VM_IP> ansible_user=<YOUR_USER> ansible_connection=ssh
 
 [node]
 ```
 
 - `[control]` → the machine that will later become the k3s control node
-- `ansible_user=matt2_chang` → the login account on the Azure VM
-- `40.81.188.168` → the VM's public IP
+- `azure-vm` → a logical name for the host (used by `host_vars/azure-vm.yml`)
+- `ansible_host=<YOUR_VM_IP>` → the actual IP Ansible connects to
+- `ansible_user=<YOUR_USER>` → the login account on the Azure VM
 - `[node]` → reserved for worker nodes to be added later (currently empty)
 
 ### Run (connecting to the remote VM)
@@ -604,7 +605,7 @@ tasks:
 - **Passwordless sudo (recommended)** — set up on the **target machine** itself, independent of Ansible:
 
   ```bash
-  echo "matt2_chang ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/matt2_chang
+  echo "<YOUR_USER> ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/<YOUR_USER>
   ```
 
   Cloud VM default users (e.g. on Azure) usually already have this configured — that's why `become: true` works without any password prompt in this project.
@@ -628,10 +629,10 @@ Defined directly on the host line as `key=value`, only applies to that host:
 
 ```ini
 [control]
-40.81.188.168 ansible_user=matt2_chang ansible_connection=ssh
+azure-vm ansible_host=<YOUR_VM_IP> ansible_user=<YOUR_USER> ansible_connection=ssh
 ```
 
-`ansible_user` and `ansible_connection` are variables that tell Ansible which user and connection method to use for this host.
+`ansible_host`, `ansible_user` and `ansible_connection` are variables that tell Ansible which user and connection method to use for this host.
 
 ### playbook `vars:` — only valid within this playbook
 
@@ -670,7 +671,7 @@ ansible/
     │       ├── vars.yml
     │       └── vault.yml
     └── host_vars/
-        └── 40.81.188.168.yml
+        └── azure-vm.yml
 ```
 
 ```yaml
@@ -681,7 +682,7 @@ demo_packages:
 ```
 
 ```yaml
-# inventory/host_vars/40.81.188.168.yml
+# inventory/host_vars/azure-vm.yml
 demo_motd_message: "Welcome to the control node"
 ```
 
@@ -724,7 +725,7 @@ ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/demo_variables
 ```
 
 - `demo_packages` comes from `inventory/group_vars/control/vars.yml` → installs `curl` and `git`
-- `demo_motd_message` comes from `inventory/host_vars/40.81.188.168.yml` → printed via `debug`
+- `demo_motd_message` comes from `inventory/host_vars/azure-vm.yml` → printed via `debug`
 - `ansible_become_pass` comes from the encrypted `inventory/group_vars/control/vault.yml` → `--ask-vault-pass` decrypts it, so `become: true` tasks no longer prompt for a sudo password
 
 > The `debug` task only checks `is defined`, never prints the value itself — printing a secret would leak it into the playbook output/log.
