@@ -118,15 +118,25 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 
 ## Architecture Overview
 
-```
-┌──────────────────────────┐         ┌──────────────────────────────┐
-│   Control machine         │         │   Target VM ([control] group) │
-│   (your laptop)           │         │   Ubuntu 22.04                 │
-│                           │  SSH    │                                │
-│   ansible-playbook  ──────┼────────▶│   tasks run here as root       │
-│   inventory + playbooks   │         │   ├─ k3s  OR  kubeadm cluster   │
-│   + roles                 │         │   └─ k9s (cluster TUI)          │
-└──────────────────────────┘         └──────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph control["💻 Control machine (your laptop)"]
+        direction TB
+        cli["ansible-playbook"]
+        assets["inventory + playbooks + roles"]
+        cli --- assets
+    end
+
+    subgraph target["☁️ Target VM — [control] group · Ubuntu 22.04"]
+        direction TB
+        k8s["k3s &nbsp;OR&nbsp; kubeadm cluster"]
+        k9s["k9s (cluster TUI)"]
+    end
+
+    control -- "SSH · tasks run as root" --> target
+
+    classDef box fill:#1f6feb22,stroke:#1f6feb,stroke-width:1px,color:#c9d1d9;
+    class control,target box;
 ```
 
 - You run `ansible-playbook` on the **control machine**; nothing is installed there.
@@ -191,9 +201,14 @@ host_key_checking = False         # avoids getting stuck on the host key prompt 
 
 ### Concept
 
-```
-Ansible reads inventory  → knows which machines to run on
-Ansible reads playbook   → knows what tasks to run
+```mermaid
+flowchart LR
+    inv["📋 inventory"] -- "which machines" --> ans(("⚙️ Ansible"))
+    pb["📜 playbook"] -- "what tasks" --> ans
+    ans --> run["▶️ run tasks on target"]
+
+    classDef node fill:#1f6feb22,stroke:#1f6feb,stroke-width:1px,color:#c9d1d9;
+    class inv,pb,ans,run node;
 ```
 
 ### File Structure
