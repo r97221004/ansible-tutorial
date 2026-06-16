@@ -73,7 +73,7 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 **Part 2 — Reusable Playbooks**
 
 - [**Idempotency**](#idempotency)
-- [**become — Privilege Escalation**](#become-privilege-escalation)
+- [**become**](#become)
 - [**Variables**](#variables)
 - [**when**](#when)
 - [**loop**](#loop)
@@ -113,7 +113,7 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 - **A control machine** (your laptop) with **Ansible 2.14+** and SSH installed.
 - **A target Linux VM** you can reach over SSH — examples use **Ubuntu 22.04** (e.g. an Azure VM).
 - **An SSH key pair**, with the public key copied to the target (covered in [Switch to SSH Connection](#switch-to-ssh-connection)).
-- **Passwordless sudo** on the target, or a Vault-stored `ansible_become_pass` (covered in [become](#become-privilege-escalation)).
+- **Passwordless sudo** on the target, or a Vault-stored `ansible_become_pass` (covered in [become](#become)).
 - **Basic comfort** with the Linux shell and YAML.
 
 > Tested with: Ansible 2.14+, Ubuntu 22.04, k3s v1.x, kubeadm/Kubernetes v1.30, k9s latest.
@@ -281,7 +281,7 @@ PLAY RECAP
 In real-world scenarios, Ansible runs commands on remote machines over SSH.
 
 ```
-Ansible (deployer)  ──SSH──>  target machine
+laptop (Ansible)  ──SSH──▶  target machine
 ```
 
 ### SSH Key Setup
@@ -564,7 +564,7 @@ To make a `shell`/`command` task idempotent, add a `creates:` (or `removes:`) ar
 
 ---
 
-## become — Privilege Escalation
+## become
 
 Many tasks (installing packages, managing services, writing to system paths) require root privileges. `become: true` tells Ansible to run with sudo.
 
@@ -1247,7 +1247,7 @@ k9s_url: >-
 
 - `retries` / `delay` / `until` → retries the download up to 3 times, 5 seconds apart, to handle network blips
 - `unarchive` → k9s releases ship as a `.tar.gz`; extract to `/tmp/` and pull the binary out
-- `become: true` only on the task that installs the k9s binary → task-level become (see [become — Privilege Escalation](#become-privilege-escalation)): downloading and extracting happen in `/tmp`, only writing to `/usr/local/bin` needs root, so the whole play doesn't need `become: true`
+- `become: true` only on the task that installs the k9s binary → task-level become (see [become](#become)): downloading and extracting happen in `/tmp`, only writing to `/usr/local/bin` needs root, so the whole play doesn't need `become: true`
 - `changed_when: false` → just a version check, never reports `changed`
 
 #### Uninstall — tasks/uninstall.yml
