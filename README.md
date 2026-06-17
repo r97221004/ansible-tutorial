@@ -1000,7 +1000,7 @@ ansible/playbooks/
 
 ### k3s Role
 
-**roles/k3s/defaults/main.yml**
+**[roles/k3s/defaults/main.yml](ansible/playbooks/roles/k3s/defaults/main.yml)**
 
 ```yaml
 ---
@@ -1020,7 +1020,7 @@ k3s_install_url: https://get.k3s.io
 - `k3s_user` → defaults to `ansible_user` from the inventory, so kubeconfig ends up owned by the right login user
 - `k3s_install_url` → k3s's official install script, kept as a variable so it can be overridden (e.g. for a mirror)
 
-**roles/k3s/tasks/main.yml**
+**[roles/k3s/tasks/main.yml](ansible/playbooks/roles/k3s/tasks/main.yml)**
 
 ```yaml
 ---
@@ -1034,7 +1034,7 @@ k3s_install_url: https://get.k3s.io
   when: k3s_state == "absent"
 ```
 
-#### Install — tasks/install.yml
+#### Install — [tasks/install.yml](ansible/playbooks/roles/k3s/tasks/install.yml)
 
 ```yaml
 ---
@@ -1085,7 +1085,7 @@ k3s_install_url: https://get.k3s.io
 - `changed_when: false` → this is a read-only query, so it never reports `changed`
 - `remote_src: true` → `/etc/rancher/k3s/k3s.yaml` is read from the **target machine**, not the control machine
 
-#### Uninstall — tasks/uninstall.yml
+#### Uninstall — [tasks/uninstall.yml](ansible/playbooks/roles/k3s/tasks/uninstall.yml)
 
 ```yaml
 ---
@@ -1164,7 +1164,7 @@ sudo systemctl status k3s     # confirm the service is running
 
 ### kube_tools Role (k9s)
 
-**roles/kube_tools/defaults/main.yml**
+**[roles/kube_tools/defaults/main.yml](ansible/playbooks/roles/kube_tools/defaults/main.yml)**
 
 ```yaml
 ---
@@ -1193,7 +1193,7 @@ k9s_url: >-
 - `k9s_bin_dir` → where the k9s binary gets installed, defaults to `/usr/local/bin` like k3s
 - `k9s_url` → a Jinja2 conditional that builds the download URL from `k9s_version` — `latest` and a pinned version use different GitHub Releases paths
 
-**roles/kube_tools/tasks/main.yml**
+**[roles/kube_tools/tasks/main.yml](ansible/playbooks/roles/kube_tools/tasks/main.yml)**
 
 ```yaml
 ---
@@ -1207,7 +1207,7 @@ k9s_url: >-
   when: kube_tools_state == "absent"
 ```
 
-#### Install — tasks/install.yml
+#### Install — [tasks/install.yml](ansible/playbooks/roles/kube_tools/tasks/install.yml)
 
 ```yaml
 ---
@@ -1251,7 +1251,7 @@ k9s_url: >-
 - `become: true` only on the task that installs the k9s binary → task-level become (see [become](#become)): downloading and extracting happen in `/tmp`, only writing to `/usr/local/bin` needs root, so the whole play doesn't need `become: true`
 - `changed_when: false` → just a version check, never reports `changed`
 
-#### Uninstall — tasks/uninstall.yml
+#### Uninstall — [tasks/uninstall.yml](ansible/playbooks/roles/kube_tools/tasks/uninstall.yml)
 
 ```yaml
 ---
@@ -1317,7 +1317,7 @@ Once inside, you'll see nodes, pods, and other resources; press `:q` or `Ctrl-C`
 
 The `kubeadm` role builds an **upstream Kubernetes** single-node control plane — closer to a "real" cluster than k3s, at the cost of more moving parts. Unlike k3s (one install script), kubeadm needs the container runtime, kernel settings, and a CNI wired up by hand, so the role splits the work into a pipeline of task files.
 
-**roles/kubeadm/tasks/main.yml** dispatches on state, same pattern as the other roles:
+**[roles/kubeadm/tasks/main.yml](ansible/playbooks/roles/kubeadm/tasks/main.yml)** dispatches on state, same pattern as the other roles:
 
 ```yaml
 ---
@@ -1345,7 +1345,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 
 > The order matters: the runtime and kernel settings must exist before `kubeadm init`, and the cluster must be initialized before a CNI can be applied. `import_tasks` (unlike `include_tasks`) is processed **statically at parse time** — Ansible validates the full sequence before running anything and tasks run in a fixed, guaranteed order.
 
-**tasks/install.yml**
+**[tasks/install.yml](ansible/playbooks/roles/kubeadm/tasks/install.yml)**
 
 ```yaml
 ---
@@ -1362,7 +1362,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
   ansible.builtin.import_tasks: flannel.yml
 ```
 
-#### prerequisites.yml
+#### [prerequisites.yml](ansible/playbooks/roles/kubeadm/tasks/prerequisites.yml)
 
 ```yaml
 ---
@@ -1454,7 +1454,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 - `creates:` on the apt key download — re-running the curl-pipe-gpg command on a key that's already there would error; skip it once the file exists
 - `dpkg_selections: selection: hold` — pins the versions so `apt upgrade` won't accidentally upgrade kubelet mid-cluster
 
-#### containerd.yml
+#### [containerd.yml](ansible/playbooks/roles/kubeadm/tasks/containerd.yml)
 
 ```yaml
 ---
@@ -1491,7 +1491,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 - `notify: Restart containerd` — if `lineinfile` changes the cgroup setting, the handler queues a restart; on re-runs where the line is already correct, the task reports `ok` and the handler is never queued — see [handlers](#handlers)
 - `creates: /etc/containerd/config.toml` — only generate the default config once; on re-runs `lineinfile` checks whether the cgroup line is already correct without regenerating the whole file
 
-#### init.yml
+#### [init.yml](ansible/playbooks/roles/kubeadm/tasks/init.yml)
 
 ```yaml
 ---
@@ -1538,7 +1538,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 - `creates: /etc/kubernetes/admin.conf` — `kubeadm init` on an already-initialized node would error; skip it once the admin config exists
 - `wait_for: port: 2379 / 6443` — etcd and the API server take several seconds to come up after init; `flannel.yml` needs the API server reachable before it can `kubectl apply`
 
-#### flannel.yml
+#### [flannel.yml](ansible/playbooks/roles/kubeadm/tasks/flannel.yml)
 
 ```yaml
 ---
@@ -1552,7 +1552,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
   ansible.builtin.lineinfile:
     path: /tmp/kube-flannel.yml
     insertafter: "- --kube-subnet-mgr"
-    regexp: '^\s*- --iface='
+    regexp: "^\\s*- --iface="
     line: "        - --iface={{ flannel_iface }}"
 
 - name: Deploy flannel
@@ -1577,7 +1577,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 - `lineinfile: regexp: / line:` — idempotent patch: if `--iface=eth0` is already in the manifest it replaces it; if not, it inserts after `--kube-subnet-mgr`; re-running produces the same result
 - `environment: KUBECONFIG:` — root doesn't have `~/.kube/config` at this point; setting `KUBECONFIG` inline targets the admin config without permanently copying it
 
-#### Uninstall — tasks/uninstall.yml
+#### Uninstall — [tasks/uninstall.yml](ansible/playbooks/roles/kubeadm/tasks/uninstall.yml)
 
 ```yaml
 ---
@@ -1637,7 +1637,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 - unhold before removal — `apt remove` fails on held packages; `dpkg_selections: selection: install` releases the hold first
 - removes the apt repo and key — so a future `apt update` doesn't try to reach a repo that's no longer needed
 
-**handlers/main.yml**
+**[handlers/main.yml](ansible/playbooks/roles/kubeadm/handlers/main.yml)**
 
 ```yaml
 ---
@@ -1654,7 +1654,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 
 The handler name must exactly match the string passed to `notify:` in the task files. Both handlers run at the end of the play — not at the point where `notify:` appears — and only if their notifying task reported `changed`.
 
-**roles/kubeadm/defaults/main.yml**
+**[roles/kubeadm/defaults/main.yml](ansible/playbooks/roles/kubeadm/defaults/main.yml)**
 
 ```yaml
 ---
