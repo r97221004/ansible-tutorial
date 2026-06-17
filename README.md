@@ -698,7 +698,7 @@ The filename (or directory name) must match the group name from the inventory (e
 
 > Since `group_vars`/`host_vars` are tied to the **inventory**, their variables are loaded for _every_ playbook run with that inventory — not just one. Prefix variable names (e.g. `demo_packages`, `demo_motd_message`) to avoid collisions with variables used by other playbooks.
 
-### playbooks/demo_variables.yml — putting it together
+### [playbooks/demo_variables.yml](ansible/playbooks/demo_variables.yml) — putting it together
 
 ```yaml
 ---
@@ -1880,7 +1880,8 @@ Contributions and corrections are welcome.
 
 1. Fork the repo and create a branch: `git checkout -b improve-xyz`.
 2. Keep changes focused; match the existing style (English, bold-keyword bullet lists).
-3. Run `ansible-lint` from the repo root before opening a PR — it must pass with no failures (CI runs the same check via [`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Lint rules are configured in [`.ansible-lint`](.ansible-lint) and [`.yamllint`](.yamllint).
-4. Open a pull request describing what changed and why.
+3. Run `ansible-lint` from the repo root before opening a PR — it must pass with no failures. Lint rules are configured in [`.ansible-lint`](.ansible-lint) and [`.yamllint`](.yamllint).
+4. If you edited the `kube_tools` role, run `molecule test` from `ansible/playbooks/roles/kube_tools/` as well — CI runs both checks on every PR via [`.github/workflows/lint.yml`](.github/workflows/lint.yml).
+5. Open a pull request describing what changed and why.
 
 Found a typo or unclear explanation? Open an issue — small fixes help every future reader.
