@@ -92,6 +92,7 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 
 **Part 4 — Running & Operating**
 
+- [**Testing**](#testing)
 - [**Running the Playbooks**](#running-the-playbooks)
 - [**Troubleshooting**](#troubleshooting)
 - [**FAQ**](#faq)
@@ -1721,6 +1722,45 @@ Both roles give you a single-node Kubernetes control plane on the same VM. Pick 
 - **`kube_tools` (k9s) works with either** — it just reads `~/.kube/config`, which both roles set up.
 
 > Don't install both on the same node — they fight over ports and the container runtime. Uninstall one before installing the other.
+
+---
+
+## Testing
+
+[Molecule](https://molecule.readthedocs.io/) is used to integration-test Ansible roles. It spins up a real container, runs the role against it, then asserts the expected outcome — catching regressions without touching a real VM.
+
+Currently the **`kube_tools` role** has a molecule test suite under [`roles/kube_tools/molecule/default/`](ansible/playbooks/roles/kube_tools/molecule/default/).
+
+### Prerequisites
+
+Docker must be running. Install the Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+### How the test works
+
+Three files drive the lifecycle:
+
+| File | Purpose |
+| ---- | ------- |
+| [`molecule.yml`](ansible/playbooks/roles/kube_tools/molecule/default/molecule.yml) | Docker driver + Ubuntu 22.04 platform (`geerlingguy/docker-ubuntu2204-ansible`) |
+| [`converge.yml`](ansible/playbooks/roles/kube_tools/molecule/default/converge.yml) | Runs the `kube_tools` role against the container |
+| [`verify.yml`](ansible/playbooks/roles/kube_tools/molecule/default/verify.yml) | Asserts k9s binary exists at `/usr/local/bin/k9s` and is executable |
+
+### Run
+
+```bash
+cd ansible/playbooks/roles/kube_tools
+
+molecule test       # full lifecycle: create → converge → verify → destroy
+molecule converge   # run the role only (keeps the container for manual inspection)
+molecule verify     # run assertions only (container must already exist)
+molecule destroy    # tear down the container
+```
+
+> `molecule test` is the standard CI command — it always starts from a clean container and destroys it afterwards. Use `converge` + `verify` separately when iterating locally.
 
 ---
 
