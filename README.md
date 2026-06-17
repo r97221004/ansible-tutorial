@@ -403,17 +403,17 @@ A few modules that show up in almost every playbook.
 
 ```yaml
 - name: Safe, no shell features needed
-  command: k3s kubectl get nodes
+  ansible.builtin.command: k3s kubectl get nodes
 
 - name: Needs a pipe, must use shell
-  shell: curl -sfL https://get.k3s.io | sh -
+  ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
 ```
 
 ### apt — package management
 
 ```yaml
 - name: Install packages
-  apt:
+  ansible.builtin.apt:
     name:
       - openssh-server
       - curl
@@ -428,13 +428,13 @@ A few modules that show up in almost every playbook.
 
 ```yaml
 - name: Create a directory
-  file:
+  ansible.builtin.file:
     path: /home/{{ ansible_user }}/.kube
     state: directory
     mode: "0755"
 
 - name: Remove a file
-  file:
+  ansible.builtin.file:
     path: /usr/local/bin/k9s
     state: absent
 ```
@@ -458,7 +458,7 @@ A few modules that show up in almost every playbook.
 
 ```yaml
 - name: Copy a static config file into each user's home directory
-  copy:
+  ansible.builtin.copy:
     src: files/app.conf
     dest: /home/{{ ansible_user }}/app.conf # task parameter → resolved by Ansible
 ```
@@ -476,7 +476,7 @@ Your IP is {{ ansible_host }}
 
 ```yaml
 - name: Generate motd from template
-  template:
+  ansible.builtin.template:
     src: motd.j2 # on the control machine (deployer), under templates/
     dest: /etc/motd # on the target/remote machine
 ```
@@ -489,7 +489,7 @@ By default `copy`/`unarchive`/etc. expect `src` to be on the control machine. Ad
 
 ```yaml
 - name: Copy kubeconfig to the user's home directory
-  copy:
+  ansible.builtin.copy:
     src: /etc/rancher/k3s/k3s.yaml # already exists on the target machine
     dest: /home/{{ ansible_user }}/.kube/config
     owner: "{{ ansible_user }}"
@@ -503,7 +503,7 @@ The `systemd` module is Ansible's equivalent of running `systemctl` commands. Th
 
 ```yaml
 - name: Ensure k3s is running and enabled on boot
-  systemd:
+  ansible.builtin.systemd:
     name: k3s
     state: started
     enabled: true
@@ -551,14 +551,14 @@ The same applies to `file` (directory already exists), `systemd` (service alread
 
 ```yaml
 - name: Always runs, always shows changed
-  shell: curl -sfL https://get.k3s.io | sh -
+  ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
 ```
 
 To make a `shell`/`command` task idempotent, add a `creates:` (or `removes:`) argument — Ansible skips the task if that path already exists:
 
 ```yaml
 - name: Only runs if k3s isn't installed yet
-  shell: curl -sfL https://get.k3s.io | sh -
+  ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
   args:
     creates: /usr/local/bin/k3s
 ```
@@ -577,7 +577,7 @@ Many tasks (installing packages, managing services, writing to system paths) req
   become: true # applies to every task in this play
   tasks:
     - name: Download and run install script
-      shell: curl -sfL https://get.k3s.io | sh -
+      ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
 ```
 
 - `become: true` at the **play level** → every task runs with sudo
@@ -586,10 +586,10 @@ Many tasks (installing packages, managing services, writing to system paths) req
 ```yaml
 tasks:
   - name: Read a normal file
-    command: cat /etc/hostname
+    ansible.builtin.command: cat /etc/hostname
 
   - name: Read a root-only file
-    command: cat /etc/shadow
+    ansible.builtin.command: cat /etc/shadow
     become: true # only this task uses sudo
 ```
 
@@ -645,7 +645,7 @@ azure-vm ansible_host=<YOUR_VM_IP> ansible_user=<YOUR_USER> ansible_connection=s
       - git
   tasks:
     - name: Install packages from a variable
-      apt:
+      ansible.builtin.apt:
         name: "{{ packages }}"
         state: present
 ```
@@ -754,7 +754,7 @@ For example, if `packages` is `[curl, git]` in `group_vars/control/vars.yml`, bu
 
 ```yaml
 - name: Only on Debian-based systems
-  apt:
+  ansible.builtin.apt:
     name: curl
     state: present
   when: ansible_os_family == "Debian"
@@ -768,12 +768,12 @@ For example, if `packages` is `[curl, git]` in `group_vars/control/vars.yml`, bu
 
 ```yaml
 - name: Check if k3s is already installed
-  stat:
+  ansible.builtin.stat:
     path: /usr/local/bin/k3s
   register: k3s_binary
 
 - name: Install k3s
-  shell: curl -sfL https://get.k3s.io | sh -
+  ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
   when: not k3s_binary.stat.exists
 ```
 
@@ -787,7 +787,7 @@ For example, if `packages` is `[curl, git]` in `group_vars/control/vars.yml`, bu
 
 ```yaml
 - name: Create multiple directories
-  file:
+  ansible.builtin.file:
     path: "/home/{{ ansible_user }}/{{ item }}"
     state: directory
   loop:
@@ -814,7 +814,7 @@ When a config file changes, the service that reads it should restart — but onl
 ```yaml
 tasks:
   - name: Configure containerd to use the systemd cgroup driver
-    lineinfile:
+    ansible.builtin.lineinfile:
       path: /etc/containerd/config.toml
       regexp: "SystemdCgroup = false"
       line: "            SystemdCgroup = true"
@@ -822,7 +822,7 @@ tasks:
 
 handlers:
   - name: Restart containerd
-    systemd:
+    ansible.builtin.systemd:
       name: containerd
       state: restarted
 ```
@@ -849,13 +849,13 @@ Tags let you run a subset of tasks from a playbook without modifying it or creat
 ```yaml
 tasks:
   - name: Install kubelet kubeadm kubectl
-    apt:
+    ansible.builtin.apt:
       name: [kubelet, kubeadm, kubectl]
       state: present
     tags: install
 
   - name: Query node status
-    command: kubectl get nodes
+    ansible.builtin.command: kubectl get nodes
     changed_when: false
     tags: verify
 ```
@@ -887,7 +887,7 @@ By default, if a task fails, Ansible stops the play on that host. These directiv
 
 ```yaml
 - name: Update apt cache (repo may be temporarily broken)
-  apt:
+  ansible.builtin.apt:
     update_cache: true
   ignore_errors: true
 ```
@@ -898,7 +898,7 @@ By default, if a task fails, Ansible stops the play on that host. These directiv
 
 ```yaml
 - name: Check root disk usage
-  command: df -h /
+  ansible.builtin.command: df -h /
   register: disk_usage
   failed_when: "'100%' in disk_usage.stdout"
 ```
@@ -913,14 +913,14 @@ By default, if a task fails, Ansible stops the play on that host. These directiv
 tasks:
   - block:
       - name: Run risky script
-        command: /usr/local/bin/risky-script.sh
+        ansible.builtin.command: /usr/local/bin/risky-script.sh
     rescue:
       - name: Notify on failure
-        debug:
+        ansible.builtin.debug:
           msg: "risky-script.sh failed, continuing anyway"
     always:
       - name: Remove lock file
-        file:
+        ansible.builtin.file:
           path: /tmp/risky.lock
           state: absent
 ```
@@ -1642,12 +1642,12 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
 ```yaml
 ---
 - name: Restart containerd
-  systemd:
+  ansible.builtin.systemd:
     name: containerd
     state: restarted
 
 - name: Restart kubelet
-  systemd:
+  ansible.builtin.systemd:
     name: kubelet
     state: restarted
 ```
