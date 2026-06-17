@@ -13,7 +13,7 @@
 
 A hands-on, example-driven Ansible refresher. Each concept is paired with a runnable playbook, and it all builds toward one concrete outcome: **provisioning a single-node Kubernetes lab (k3s or kubeadm) on a remote VM over SSH** — then tearing it back down, idempotently.
 
-![k9s inspecting the cluster](docs/images/k9s.png)
+![k9s inspecting the cluster](docs/images/k9s.gif)
 
 > Best for readers who already know Ansible basics and want a fast, practical refresh (~20–40 min). New to Ansible? Read top to bottom. Just refreshing? Jump straight to the [Table of Contents](#table-of-contents).
 
