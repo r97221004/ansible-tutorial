@@ -13,10 +13,6 @@
 
 A hands-on, example-driven Ansible refresher. Each concept is paired with a runnable playbook, and it all builds toward one concrete outcome: **provisioning a single-node Kubernetes lab (k3s or kubeadm) on a remote VM over SSH** — then tearing it back down, idempotently.
 
-<!-- TODO: add a demo screenshot/GIF here for stronger first impression.
-     Suggested: a k9s TUI shot or the install run. Save it under docs/images/
-     and uncomment the line below. -->
-
 ![k9s inspecting the cluster](docs/images/k9s.png)
 
 > Best for readers who already know Ansible basics and want a fast, practical refresh (~20–40 min). New to Ansible? Read top to bottom. Just refreshing? Jump straight to the [Table of Contents](#table-of-contents).
@@ -36,6 +32,8 @@ ansible control -i ansible/inventory/azure.ini -m ping
 # 3. Install a single-node k3s cluster
 ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_k3s.yml
 ```
+
+> **Sudo password?** If your target requires a password for `sudo`, add `--ask-become-pass` to step 3. Azure VMs and most cloud instances already have passwordless sudo configured, so no extra flag is needed. For managing secrets in a team or CI environment, see [Ansible Vault](#ansible-vault).
 
 Expected tail of the install run:
 
@@ -114,7 +112,7 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 - **A control machine** (your laptop) with **Ansible 2.14+** and SSH installed.
 - **A target Linux VM** you can reach over SSH — examples use **Ubuntu 22.04** (e.g. an Azure VM).
 - **An SSH key pair**, with the public key copied to the target (covered in [Switch to SSH Connection](#switch-to-ssh-connection)).
-- **Passwordless sudo** on the target, or a Vault-stored `ansible_become_pass` (covered in [become](#become)).
+- **Passwordless sudo** on the target (Azure/cloud VMs default), or a sudo password passed via `--ask-become-pass` or [Ansible Vault](#ansible-vault).
 - **Basic comfort** with the Linux shell and YAML.
 
 > Tested with: Ansible 2.14+, Ubuntu 22.04, k3s v1.x, kubeadm/Kubernetes v1.30, k9s latest.
@@ -1824,9 +1822,10 @@ Look at the `PLAY RECAP` — a second run should report `changed=0`. Any task st
 </details>
 
 <details>
-<summary><strong><code>--ask-vault-pass</code> required / "Attempting to decrypt but no vault secrets found"</strong></summary>
+<summary><strong>"Attempting to decrypt but no vault secrets found"</strong></summary>
 
-- Playbooks that read `group_vars/control/vault.yml` need the vault password: add `--ask-vault-pass`.
+- You have a `group_vars/control/vault.yml` that is Ansible Vault-encrypted. Add `--ask-vault-pass` to your command, or remove the file if you no longer need it.
+- `vault.yml` is not included in this repo — if you created one locally and forgot the password, delete it and re-create it with `ansible-vault create`.
 - View encrypted contents without decrypting on disk: `ansible-vault view inventory/group_vars/control/vault.yml`.
 
 </details>
@@ -1871,6 +1870,7 @@ Look at the `PLAY RECAP` — a second run should report `changed=0`. Any task st
 - **Pin versions**: set `k9s_version` / kubeadm Kubernetes version for reproducible builds.
 - **Deploy a workload**: `kubectl create deployment web --image=nginx` and explore it in `k9s`.
 - **Go multi-host**: point the inventory at several VMs and run the same playbook unchanged.
+- **Add molecule tests**: only `kube_tools` has a test suite today — `k3s` and `kubeadm` are good candidates to cover next.
 
 ---
 

@@ -8,6 +8,9 @@
 vault-password*
 *.vault_pass
 
+# Vault files (create locally with: ansible-vault create)
+**/group_vars/**/vault.yml
+
 # Local inventory / secret overrides
 **/host_vars/*.local.yml
 **/group_vars/*/*.local.yml
