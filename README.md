@@ -19,7 +19,7 @@ A hands-on, example-driven Ansible refresher. Each concept is paired with a runn
 
 ## Quick Start
 
-Already have Ansible installed and a reachable Linux VM? Get a Kubernetes node running in three commands:
+Already have Ansible installed and a reachable Linux VM? Get a Kubernetes node running in four commands:
 
 ```bash
 # 1. Point the inventory at your VM (edit ansible/inventory/azure.ini)
@@ -31,9 +31,12 @@ ansible control -i ansible/inventory/azure.ini -m ping
 
 # 3. Install a single-node k3s cluster
 ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_k3s.yml
+
+# 4. Install k9s to inspect the cluster
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kube_tools.yml
 ```
 
-> **Sudo password?** If your target requires a password for `sudo`, add `--ask-become-pass` to step 3. Azure VMs and most cloud instances already have passwordless sudo configured, so no extra flag is needed. For managing secrets in a team or CI environment, see [Ansible Vault](#ansible-vault).
+> **Sudo password?** If your target requires a password for `sudo`, add `--ask-become-pass` to steps 3 and 4. Azure VMs and most cloud instances already have passwordless sudo configured, so no extra flag is needed. For managing secrets in a team or CI environment, see [Ansible Vault](#ansible-vault).
 
 Expected tail of the install run:
 
