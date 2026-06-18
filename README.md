@@ -123,23 +123,36 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 ## Architecture Overview
 
 ```mermaid
+---
+config:
+  look: handDrawn
+  theme: default
+  themeVariables:
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+---
 flowchart LR
-    subgraph control["Control machine — your laptop"]
+    subgraph control["💻 Control machine — your laptop"]
         direction TB
-        inv["inventory<br/>hosts &amp; connection vars"]
-        pb["playbooks + roles<br/>k3s · kubeadm · kube_tools"]
+        inv["📋 inventory<br/>hosts &amp; connection vars"]
+        pb["📜 playbooks + roles<br/>k3s · kubeadm · kube_tools"]
+        ans["⚙️ ansible-playbook"]
     end
 
-    subgraph target["Target VM — Ubuntu 22.04"]
-        k8s["k3s OR kubeadm<br/>single-node cluster"]
+    subgraph target["🐧 Target VM — Ubuntu 22.04"]
+        k8s["☸️ k3s OR kubeadm<br/>single-node cluster"]
     end
 
-    control -->|"SSH · sudo where needed"| target
+    inv --> ans
+    pb --> ans
+    ans ==>|"🔐 SSH · sudo where needed"| k8s
 
-    classDef ctrl fill:#1f6feb1a,stroke:#1f6feb,stroke-width:1.5px,color:#c9d1d9;
-    classDef tgt fill:#2386361a,stroke:#238636,stroke-width:1.5px,color:#c9d1d9;
-    class control ctrl;
-    class target tgt;
+    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
+    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
+    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    class inv,pb ctrl;
+    class ans eng;
+    class k8s tgt;
+    linkStyle 2 stroke:#D97706,stroke-width:3px;
 ```
 
 - You run `ansible-playbook` on the **control machine**; no agent is installed on the target — Ansible just needs SSH access.
@@ -205,13 +218,24 @@ host_key_checking = False         # avoids getting stuck on the host key prompt 
 ### Concept
 
 ```mermaid
+---
+config:
+  look: handDrawn
+  theme: default
+  themeVariables:
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+---
 flowchart LR
-    inv["inventory"] -- "which machines" --> ans(("Ansible"))
-    pb["playbook"] -- "what tasks" --> ans
-    ans --> run["run tasks on target"]
+    inv["📋 inventory"] -- "which machines" --> ans["⚙️ Ansible"]
+    pb["📜 playbook"] -- "what tasks" --> ans
+    ans ==> run["🎯 run tasks on target"]
 
-    classDef node fill:#1f6feb1a,stroke:#1f6feb,stroke-width:1px,color:#c9d1d9;
-    class inv,pb,ans,run node;
+    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
+    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
+    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    class inv,pb ctrl;
+    class ans eng;
+    class run tgt;
 ```
 
 ### File Structure
