@@ -1,6 +1,6 @@
 ---
 - name: Hello World
-  hosts: control
+  hosts: all
   tasks:
     - name: Print message
       ansible.builtin.debug:

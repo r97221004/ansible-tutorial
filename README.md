@@ -264,7 +264,7 @@ localhost ansible_connection=local
 ```yaml
 ---
 - name: Hello World
-  hosts: local # corresponds to the [local] group in inventory
+  hosts: all # runs against every host in whichever inventory you pass
   tasks:
     - name: Print message
       ansible.builtin.debug:
@@ -275,7 +275,7 @@ localhost ansible_connection=local
         msg: "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
 ```
 
-- `hosts` → which group to run against
+- `hosts` → which group to run against (`all` = every host in the inventory you pass)
 - `tasks` → list of tasks to execute
 - `debug` → module that prints to the screen
 - `{{ }}` → variable syntax, automatically gathered by Ansible during the Gathering Facts phase

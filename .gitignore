@@ -15,6 +15,10 @@ vault-password*
 **/host_vars/*.local.yml
 **/group_vars/*/*.local.yml
 
+# Python virtualenv
+.venv/
+venv/
+
 # Editor / OS
 .vscode/
 .idea/
