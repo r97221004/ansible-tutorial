@@ -1007,11 +1007,13 @@ ansible_become_pass: supersecret
 
 ### Running playbooks with Vault
 
+You only need a vault password flag when the run **loads at least one Vault-encrypted file** (e.g. an encrypted `group_vars`/`host_vars` file or one pulled in via `vars_files`). If nothing encrypted is loaded, omit it — passing `--ask-vault-pass` with no encrypted files errors out with `Attempting to decrypt but no vault secrets found`.
+
 - `--ask-vault-pass` → prompt for the vault password interactively
 - `--vault-password-file <path>` → read the password from a file (the file itself should not be committed)
 
 ```bash
-ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/demo_variables.yml --ask-vault-pass
+ansible-playbook -i ansible/inventory/azure.ini <your-playbook>.yml --ask-vault-pass
 ```
 
 ---
