@@ -485,8 +485,14 @@ A few modules that show up in almost every playbook.
     state: absent
 ```
 
-- `state: directory` → create a directory
+- `state: directory` → create a directory (on the **remote managed host**, not the control node)
 - `state: absent` → remove a file or directory
+- `mode: "0755"` → set permissions, same as `chmod` (quote it, or YAML may misread the octal)
+
+| mode     | owner | group | other | typical use              |
+| -------- | ----- | ----- | ----- | ------------------------ |
+| `"0755"` | `rwx` | `r-x` | `r-x` | directories, executables |
+| `"0644"` | `rw-` | `r--` | `r--` | regular files            |
 
 ### copy vs template
 
