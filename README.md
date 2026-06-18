@@ -199,7 +199,7 @@ ansible --version
 
 ---
 
-## ansible.cfg
+## [ansible.cfg](ansible/ansible.cfg)
 
 Placed in the `ansible/` directory and automatically applied when running `ansible-playbook` from there:
 
@@ -248,7 +248,7 @@ ansible/
     └── hello.yml        ← task to run
 ```
 
-### inventory/localhost.ini
+### [inventory/localhost.ini](ansible/inventory/localhost.ini)
 
 ```ini
 [local]
@@ -259,7 +259,7 @@ localhost ansible_connection=local
 - `localhost` → machine name (itself)
 - `ansible_connection=local` → don't use SSH, run directly on the local machine
 
-### playbooks/hello.yml
+### [playbooks/hello.yml](ansible/playbooks/hello.yml)
 
 ```yaml
 ---
@@ -360,7 +360,7 @@ ssh <YOUR_USER>@<YOUR_VM_IP>
 # connects without a password = success
 ```
 
-### inventory/azure.ini
+### [inventory/azure.ini](ansible/inventory/azure.ini)
 
 The inventory used for the remote VM:
 
