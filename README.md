@@ -455,6 +455,14 @@ A few modules that show up in almost every playbook.
   ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
 ```
 
+Unlike `apt` or `file`, `command`/`shell` can't tell whether they actually changed anything, so they **always report `changed`**. Add `changed_when:` to say when a task really counts as a change — use `changed_when: false` for read-only queries so they report `ok` instead of a misleading `changed`:
+
+```yaml
+- name: Query node status (read-only, never changes anything)
+  ansible.builtin.command: kubectl get nodes
+  changed_when: false
+```
+
 ### apt — package management
 
 ```yaml
