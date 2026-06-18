@@ -386,6 +386,12 @@ ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/hello.yml
 > From Ansible's perspective, whether connecting locally or to a remote Azure VM, the playbook doesn't need to change at all —
 > **just swap the IP and account in the inventory**. This is exactly the value Ansible provides.
 
+> **Targeting specific groups:** this demo uses `hosts: all` so the one file runs against
+> whatever inventory you pass. Real playbooks here (k3s, kubeadm) instead target a group —
+> e.g. `hosts: control` — so they only touch the intended machines. Once you add workers to
+> `[node]`, `all` would hit those too; `control` keeps it to the control node.
+> Need more than one group? Combine them with `hosts: control:node`.
+
 ---
 
 ## Ad-hoc Commands
