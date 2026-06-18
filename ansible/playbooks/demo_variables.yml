@@ -12,7 +12,3 @@
     - name: Show host_vars message
       ansible.builtin.debug:
         msg: "{{ demo_motd_message }}"
-
-    - name: Confirm ansible_become_pass was loaded from Vault
-      ansible.builtin.debug:
-        msg: "ansible_become_pass is defined: {{ ansible_become_pass is defined }}"

@@ -529,7 +529,7 @@ Your IP is {{ ansible_host }}
 ```yaml
 - name: Generate motd from template
   ansible.builtin.template:
-    src: motd.j2 # on the control machine (deployer), under templates/
+    src: motd.j2 # on the control machine, under templates/
     dest: /etc/motd # on the target/remote machine
 ```
 
@@ -766,21 +766,14 @@ The filename (or directory name) must match the group name from the inventory (e
     - name: Show host_vars message
       ansible.builtin.debug:
         msg: "{{ demo_motd_message }}"
-
-    - name: Confirm ansible_become_pass was loaded from Vault
-      ansible.builtin.debug:
-        msg: "ansible_become_pass is defined: {{ ansible_become_pass is defined }}"
 ```
 
 ```bash
-ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/demo_variables.yml --ask-vault-pass
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/demo_variables.yml
 ```
 
 - `demo_packages` comes from `inventory/group_vars/control/vars.yml` → installs `curl` and `git`
 - `demo_motd_message` comes from `inventory/host_vars/azure-vm.yml` → printed via `debug`
-- `ansible_become_pass` comes from the encrypted `inventory/group_vars/control/vault.yml` → `--ask-vault-pass` decrypts it, so `become: true` tasks no longer prompt for a sudo password
-
-> The `debug` task only checks `is defined`, never prints the value itself — printing a secret would leak it into the playbook output/log.
 
 ### command line `-e` — override at run time
 
