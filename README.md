@@ -142,7 +142,7 @@ flowchart LR
     class target tgt;
 ```
 
-- You run `ansible-playbook` on the **control machine**; nothing is installed on the target by Ansible itself.
+- You run `ansible-playbook` on the **control machine**; no agent is installed on the target — Ansible just needs SSH access.
 - Ansible reads the **inventory** (which hosts, how to connect) and the **playbooks + roles** (what to do) independently, then connects over **SSH** and applies the tasks on the **target VM**.
 - The same playbook works for one VM or many — you only change the inventory.
 
