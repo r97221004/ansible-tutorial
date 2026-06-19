@@ -1904,8 +1904,11 @@ ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kubead
 # 3. Install tooling
 ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kube_tools.yml
 
-# 4. Tear down when done
+# 4. Tear down when done (reverse order: tooling first, then the cluster)
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kube_tools.yml
 ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_k3s.yml
+# or, if you installed kubeadm
+ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kubeadm.yml
 ```
 
 > With `ansible.cfg`'s default inventory, you can drop `-i ansible/inventory/azure.ini` **when running from inside the `ansible/` directory**.
