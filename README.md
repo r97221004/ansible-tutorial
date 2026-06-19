@@ -1113,6 +1113,11 @@ k3s_install_url: https://get.k3s.io
   when: k3s_state == "absent"
 ```
 
+There are two ways to pull in another task file, and they differ in **when** the file is read:
+
+- `include_tasks` → **dynamic**: the file is loaded at runtime, only when Ansible reaches this task. Because the `when` is evaluated first, the other branch's file is never even opened — ideal for this kind of conditional dispatch.
+- `import_tasks` → **static**: the file's tasks are pulled in at parse time (before the play runs), as if written inline. Ansible validates the whole sequence upfront and runs them in a fixed order — better for an ordered pipeline (the kubeadm role uses this; see [kubeadm Role](#kubeadm-role)).
+
 #### Install — [tasks/install.yml](ansible/playbooks/roles/k3s/tasks/install.yml)
 
 ```yaml
