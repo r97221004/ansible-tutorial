@@ -1055,6 +1055,30 @@ ansible/playbooks/
 
 ### k3s Role
 
+```mermaid
+---
+config:
+  look: handDrawn
+  theme: default
+  themeVariables:
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+---
+flowchart TB
+    pb["📜 playbook<br/>roles: - k3s"] --> main{"⚙️ tasks/main.yml<br/>k3s_state?"}
+    main -- "present" --> inst["📥 install.yml"]
+    main -- "absent" --> uninst["🗑️ uninstall.yml"]
+
+    inst --> i1["run install script<br/>(creates: skip if exists)"] --> i2["start & enable service"] --> i3["wait for kubeconfig"] --> i4["create .kube directory"] --> i5["copy kubeconfig to user"]
+    uninst --> u1["run uninstall script<br/>(removes: skip if gone)"] --> u2["remove config & data dirs"] --> u3["remove kubeconfig"] --> u4["verify binary gone"]
+
+    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
+    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
+    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    class pb ctrl;
+    class main eng;
+    class inst,uninst,i1,i2,i3,i4,i5,u1,u2,u3,u4 tgt;
+```
+
 **[roles/k3s/defaults/main.yml](ansible/playbooks/roles/k3s/defaults/main.yml)**
 
 ```yaml
@@ -1371,6 +1395,34 @@ Once inside, you'll see nodes, pods, and other resources; press `:q` or `Ctrl-C`
 ### kubeadm Role
 
 The `kubeadm` role builds an **upstream Kubernetes** single-node control plane — closer to a "real" cluster than k3s, at the cost of more moving parts. Unlike k3s (one install script), kubeadm needs the container runtime, kernel settings, and a CNI wired up by hand, so the role splits the work into a pipeline of task files.
+
+```mermaid
+---
+config:
+  look: handDrawn
+  theme: default
+  themeVariables:
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+---
+flowchart TB
+    pb["📜 playbook<br/>roles: - kubeadm"] --> main{"⚙️ tasks/main.yml<br/>kubeadm_state?"}
+    main -- "present" --> inst["📥 install.yml<br/>(ordered pipeline)"]
+    main -- "absent" --> uninst["🗑️ uninstall.yml"]
+
+    inst --> P["prerequisites<br/>• kernel modules + sysctl<br/>• add k8s apt repo<br/>• install + hold packages"]
+    P --> C["containerd<br/>• install<br/>• systemd cgroup driver<br/>• start service"]
+    C --> I["init<br/>• kubeadm init<br/>• wait etcd + API server<br/>• copy kubeconfig"]
+    I --> F["flannel<br/>• deploy CNI<br/>• node Ready"]
+
+    uninst --> U["uninstall<br/>• kubeadm reset<br/>• remove kubeconfig + CNI<br/>• unhold + remove packages<br/>• remove apt repo + key<br/>• verify cluster gone"]
+
+    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
+    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
+    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    class pb ctrl;
+    class main eng;
+    class inst,uninst,P,C,I,F,U tgt;
+```
 
 **[roles/kubeadm/tasks/main.yml](ansible/playbooks/roles/kubeadm/tasks/main.yml)** dispatches on state, same pattern as the other roles:
 
