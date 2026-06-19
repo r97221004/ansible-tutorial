@@ -885,7 +885,12 @@ handlers:
 - **Conditional** — if the notifying task reports `ok` (nothing changed), the handler is never queued; no change, no restart
 - **Ordered** — multiple handlers run in declaration order, not the order they were notified
 
-> The kubeadm role uses this pattern in practice: `containerd.yml` notifies `restart containerd` from `handlers/main.yml` — see [kubeadm Role](#kubeadm-role).
+**Where handlers live** depends on whether you use a role:
+
+- **Single playbook** — define them inline in the play's `handlers:` block, as shown above.
+- **Role** — put them in their own `handlers/main.yml`; Ansible loads it automatically (no import needed). `notify:` matches a handler by its **name**, not by file path, so the task and the handler can sit in different files.
+
+> The kubeadm role uses this pattern in practice: `containerd.yml` notifies `Restart containerd`, which is defined in [`handlers/main.yml`](ansible/playbooks/roles/kubeadm/handlers/main.yml) — see [kubeadm Role](#kubeadm-role).
 
 To force handlers to run mid-play instead of waiting until the end:
 
@@ -1600,7 +1605,7 @@ prerequisites.yml → containerd.yml → init.yml → flannel.yml
     enabled: true
 ```
 
-- `notify: Restart containerd` — if `lineinfile` changes the cgroup setting, the handler queues a restart; on re-runs where the line is already correct, the task reports `ok` and the handler is never queued — see [handlers](#handlers)
+- `notify: Restart containerd` — the handler itself is defined in [`handlers/main.yml`](ansible/playbooks/roles/kubeadm/handlers/main.yml) (shown below); if `lineinfile` changes the cgroup setting, the handler queues a restart; on re-runs where the line is already correct, the task reports `ok` and the handler is never queued — see [handlers](#handlers)
 - `creates: /etc/containerd/config.toml` — only generate the default config once; on re-runs `lineinfile` checks whether the cgroup line is already correct without regenerating the whole file
 
 #### [init.yml](ansible/playbooks/roles/kubeadm/tasks/init.yml)
