@@ -5,7 +5,7 @@
 ![Kubernetes](https://img.shields.io/badge/Lab-k3s%20%7C%20kubeadm-326CE5?logo=kubernetes&logoColor=white)
 [![Lint](https://github.com/r97221004/ansible-tutorial/actions/workflows/lint.yml/badge.svg)](https://github.com/r97221004/ansible-tutorial/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Stars](https://img.shields.io/badge/Stars-1-blue?logo=github&style=social)](https://github.com/r97221004/ansible-tutorial/stargazers)
+[![Stars](https://img.shields.io/badge/Stars-7-blue?logo=github&style=social)](https://github.com/r97221004/ansible-tutorial/stargazers)
 
 > **Problem**: Manually SSH-ing into multiple machines to install packages, copy configs, and start services is slow, repetitive, and easy to get inconsistent.
 >
@@ -1845,6 +1845,12 @@ Both roles give you a single-node Kubernetes control plane on the same VM. Pick 
 
 [Molecule](https://molecule.readthedocs.io/) is used to integration-test Ansible roles. It spins up a real container, runs the role against it, then asserts the expected outcome — catching regressions without touching a real VM.
 
+Why test a role this way:
+
+- **Real OS, throwaway cost** — the role runs against an actual Ubuntu container, not a mock, yet it's created and destroyed in seconds with no cloud VM to pay for or clean up.
+- **Idempotence is checked for you** — `molecule test` runs the role **twice** and fails if the second run reports any change, automatically catching tasks that aren't idempotent (exactly what `changed_when:` and `creates:` are there to guard against).
+- **Repeatable and CI-friendly** — every run starts from an identical clean container, so a pass proves the role works from scratch, not just on a machine you've already configured by hand.
+
 Currently the **`kube_tools` role** has a molecule test suite under [`roles/kube_tools/molecule/default/`](ansible/playbooks/roles/kube_tools/molecule/default/).
 
 ### Prerequisites
@@ -1870,7 +1876,7 @@ Three files drive the lifecycle:
 ```bash
 cd ansible/playbooks/roles/kube_tools
 
-molecule test       # full lifecycle: create → converge → verify → destroy
+molecule test       # full lifecycle: create → converge → idempotence → verify → destroy
 molecule converge   # run the role only (keeps the container for manual inspection)
 molecule verify     # run assertions only (container must already exist)
 molecule destroy    # tear down the container
