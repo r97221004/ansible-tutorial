@@ -5,7 +5,7 @@
 ![Kubernetes](https://img.shields.io/badge/Lab-k3s%20%7C%20kubeadm-326CE5?logo=kubernetes&logoColor=white)
 [![Lint](https://github.com/r97221004/ansible-tutorial/actions/workflows/lint.yml/badge.svg)](https://github.com/r97221004/ansible-tutorial/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Stars](https://img.shields.io/badge/Stars-7-blue?logo=github&style=social)](https://github.com/r97221004/ansible-tutorial/stargazers)
+[![Stars](https://img.shields.io/badge/Stars-8-blue?logo=github&style=social)](https://github.com/r97221004/ansible-tutorial/stargazers)
 
 > **Problem**: Manually SSH-ing into multiple machines to install packages, copy configs, and start services is slow, repetitive, and easy to get inconsistent.
 >
@@ -126,9 +126,17 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 ---
 config:
   look: handDrawn
-  theme: default
+  theme: dark
   themeVariables:
     fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+    darkMode: true
+    background: '#11151c'
+    primaryColor: '#0B3B2E'
+    primaryBorderColor: '#22C55E'
+    primaryTextColor: '#F8FAFC'
+    lineColor: '#F8FAFC'
+    clusterBkg: '#11151c'
+    clusterBorder: '#94A3B8'
 ---
 flowchart LR
     subgraph control["💻 Control machine — your laptop"]
@@ -146,13 +154,13 @@ flowchart LR
     pb --> ans
     ans ==>|"🔐 SSH · sudo where needed"| k8s
 
-    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
-    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
-    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    classDef ctrl fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
+    classDef eng fill:#7C4A03,stroke:#F59E0B,stroke-width:3px,color:#F8FAFC;
+    classDef tgt fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
     class inv,pb ctrl;
     class ans eng;
     class k8s tgt;
-    linkStyle 2 stroke:#D97706,stroke-width:3px;
+    linkStyle 2 stroke:#F59E0B,stroke-width:3px;
 ```
 
 - You run `ansible-playbook` on the **control machine**; no agent is installed on the target — Ansible just needs SSH access.
@@ -221,18 +229,26 @@ host_key_checking = False         # avoids getting stuck on the host key prompt 
 ---
 config:
   look: handDrawn
-  theme: default
+  theme: dark
   themeVariables:
     fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+    darkMode: true
+    background: '#11151c'
+    primaryColor: '#0B3B2E'
+    primaryBorderColor: '#22C55E'
+    primaryTextColor: '#F8FAFC'
+    lineColor: '#F8FAFC'
+    clusterBkg: '#11151c'
+    clusterBorder: '#94A3B8'
 ---
 flowchart LR
     inv["📋 inventory"] -- "which machines" --> ans["⚙️ Ansible"]
     pb["📜 playbook"] -- "what tasks" --> ans
     ans ==> run["🎯 run tasks on target"]
 
-    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
-    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
-    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    classDef ctrl fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
+    classDef eng fill:#7C4A03,stroke:#F59E0B,stroke-width:3px,color:#F8FAFC;
+    classDef tgt fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
     class inv,pb ctrl;
     class ans eng;
     class run tgt;
@@ -1064,9 +1080,17 @@ ansible/playbooks/
 ---
 config:
   look: handDrawn
-  theme: default
+  theme: dark
   themeVariables:
     fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+    darkMode: true
+    background: '#11151c'
+    primaryColor: '#0B3B2E'
+    primaryBorderColor: '#22C55E'
+    primaryTextColor: '#F8FAFC'
+    lineColor: '#F8FAFC'
+    clusterBkg: '#11151c'
+    clusterBorder: '#94A3B8'
 ---
 flowchart TB
     pb["📜 playbook<br/>roles: - k3s"] --> main{"⚙️ tasks/main.yml<br/>k3s_state?"}
@@ -1076,9 +1100,9 @@ flowchart TB
     inst --> i1["run install script<br/>(creates: skip if exists)"] --> i2["start & enable service"] --> i3["wait for kubeconfig"] --> i4["create .kube directory"] --> i5["copy kubeconfig to user"]
     uninst --> u1["run uninstall script<br/>(removes: skip if gone)"] --> u2["remove config & data dirs"] --> u3["remove kubeconfig"] --> u4["verify binary gone"]
 
-    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
-    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
-    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    classDef ctrl fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
+    classDef eng fill:#7C4A03,stroke:#F59E0B,stroke-width:3px,color:#F8FAFC;
+    classDef tgt fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
     class pb ctrl;
     class main eng;
     class inst,uninst,i1,i2,i3,i4,i5,u1,u2,u3,u4 tgt;
@@ -1410,9 +1434,17 @@ The `kubeadm` role builds an **upstream Kubernetes** single-node control plane �
 ---
 config:
   look: handDrawn
-  theme: default
+  theme: dark
   themeVariables:
     fontFamily: '"Comic Sans MS", "Comic Sans", "Segoe Print", "Bradley Hand", cursive'
+    darkMode: true
+    background: '#11151c'
+    primaryColor: '#0B3B2E'
+    primaryBorderColor: '#22C55E'
+    primaryTextColor: '#F8FAFC'
+    lineColor: '#F8FAFC'
+    clusterBkg: '#11151c'
+    clusterBorder: '#94A3B8'
 ---
 flowchart TB
     pb["📜 playbook<br/>roles: - kubeadm"] --> main{"⚙️ tasks/main.yml<br/>kubeadm_state?"}
@@ -1426,9 +1458,9 @@ flowchart TB
 
     uninst --> U["uninstall<br/>• kubeadm reset<br/>• remove kubeconfig + CNI<br/>• unhold + remove packages<br/>• remove apt repo + key<br/>• verify cluster gone"]
 
-    classDef ctrl fill:#EAF2FF,stroke:#2563EB,stroke-width:2px,color:#0F172A;
-    classDef eng fill:#FFE8B3,stroke:#D97706,stroke-width:3px,color:#0F172A;
-    classDef tgt fill:#D7F7E6,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    classDef ctrl fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
+    classDef eng fill:#7C4A03,stroke:#F59E0B,stroke-width:3px,color:#F8FAFC;
+    classDef tgt fill:#0B3B2E,stroke:#22C55E,stroke-width:2px,color:#F8FAFC;
     class pb ctrl;
     class main eng;
     class inst,uninst,P,C,I,F,U tgt;
