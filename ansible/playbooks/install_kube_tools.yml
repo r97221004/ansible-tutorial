@@ -1,7 +1,7 @@
 ---
 # Install cluster operation tools (k9s, Helm)
 # Installed on the control node by default, so you can SSH in and inspect with k9s.
-# To run it locally against a remote cluster, switch to hosts: local with the localhost inventory:
+# To run it locally against a remote cluster, use the localhost inventory (its group is also control):
 #   ansible-playbook -i inventory/localhost.ini playbooks/install_kube_tools.yml
 # Usage (install on the control node): ansible-playbook playbooks/install_kube_tools.yml
 - name: Install kube tools

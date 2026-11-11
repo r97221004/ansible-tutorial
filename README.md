@@ -173,7 +173,7 @@ flowchart LR
 ansible/
 ├── ansible.cfg                 # default inventory + SSH behavior
 ├── inventory/
-│   ├── localhost.ini           # [local] group, runs tasks on your machine
+│   ├── localhost.ini           # [control] group pointing at your own machine
 │   ├── azure.ini               # [control]/[node] groups for remote VMs  ← edit this
 │   ├── group_vars/control/     # vars.yml (plain) + vault.yml (encrypted)
 │   └── host_vars/              # per-host variables
@@ -267,13 +267,16 @@ ansible/
 ### [inventory/localhost.ini](ansible/inventory/localhost.ini)
 
 ```ini
-[local]
-localhost ansible_connection=local
+[control]
+localhost ansible_connection=local ansible_user=<YOUR_USER>
 ```
 
-- `[local]` → group name
+- `[control]` → group name; it matches the group in `azure.ini`, so playbooks with `hosts: control` can run on your own machine just by passing this inventory
 - `localhost` → machine name (itself)
 - `ansible_connection=local` → don't use SSH, run directly on the local machine
+- `ansible_user=<YOUR_USER>` → replace with your local username; the local connection doesn't log in with it, but roles use `{{ ansible_user }}` (e.g. as the kubeconfig owner)
+
+> Because `localhost` is in the `control` group, it also picks up everything in [`group_vars/control/`](#group_vars--host_vars--managed-separately-from-inventory). Once you create the Vault-encrypted `group_vars/control/vault.yml` (see [Ansible Vault](#ansible-vault)), local runs load it too — add `--ask-vault-pass`, and note that its `ansible_become_pass` will also be used for `sudo` on your own machine.
 
 ### [playbooks/hello.yml](ansible/playbooks/hello.yml)
 
@@ -1479,7 +1482,7 @@ ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kube
 ```
 
 - Unlike the k3s play, there's **no play-level `become: true`** here — only the tasks that write `/usr/local/bin/k9s` and `/usr/local/bin/helm` declare their own `become: true`; everything else runs as the normal user
-- `hosts: control` → installs on the control node by default, so you can SSH in and use k9s to inspect the cluster; to run it locally against a remote cluster instead, change to `hosts: local` with a local inventory
+- `hosts: control` → installs on the control node by default, so you can SSH in and use k9s to inspect the cluster; to run it locally against a remote cluster instead, pass `-i ansible/inventory/localhost.ini` — its group is also `control`, so no `hosts:` change is needed
 
 #### Verify
 

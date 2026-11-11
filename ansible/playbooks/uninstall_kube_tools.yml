@@ -1,6 +1,6 @@
 ---
 # Uninstall cluster operation tools (k9s, Helm)
-# Removes k9s and Helm from the control node by default; for the local machine add -i inventory/localhost.ini and switch hosts: local
+# Removes k9s and Helm from the control node by default; for the local machine add -i inventory/localhost.ini
 # Usage: ansible-playbook playbooks/uninstall_kube_tools.yml
 - name: Uninstall kube tools
   hosts: control
