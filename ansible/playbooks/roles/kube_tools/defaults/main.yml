@@ -17,3 +17,9 @@ k9s_url: >-
     if k9s_version == 'latest'
     else 'https://github.com/derailed/k9s/releases/download/' ~ k9s_version ~ '/k9s_Linux_amd64.tar.gz'
   }}
+
+# Helm version: latest looks up the newest release via the GitHub API, or pin one like v4.3.1
+helm_version: latest
+
+# binary install location
+helm_bin_dir: /usr/local/bin

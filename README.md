@@ -32,7 +32,7 @@ ansible control -i ansible/inventory/azure.ini -m ping
 # 3. Install a single-node k3s cluster
 ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_k3s.yml
 
-# 4. Install k9s to inspect the cluster
+# 4. Install k9s and Helm to work with the cluster
 ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kube_tools.yml
 ```
 
@@ -87,7 +87,7 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 
 - [**Ansible Roles**](#ansible-roles)
   - [**k3s Role**](#k3s-role)
-  - [**kube_tools Role (k9s)**](#kube_tools-role-k9s)
+  - [**kube_tools Role (k9s, Helm)**](#kube_tools-role-k9s-helm)
   - [**kubeadm Role**](#kubeadm-role)
 - [**Choosing k3s vs kubeadm**](#choosing-k3s-vs-kubeadm)
 
@@ -108,7 +108,7 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 - **Write idempotent tasks** so re-running a playbook is always safe.
 - **Parameterize playbooks** with inventory, `group_vars`/`host_vars`, and Ansible Vault for secrets.
 - **Control flow** with `when`, `loop`, privilege escalation (`become`), and error handling.
-- **Package logic into roles** and use them to install/uninstall a single-node Kubernetes lab (k3s, kubeadm) plus tooling (k9s).
+- **Package logic into roles** and use them to install/uninstall a single-node Kubernetes lab (k3s, kubeadm) plus tooling (k9s, Helm).
 
 ## Prerequisites
 
@@ -118,7 +118,7 @@ Full prerequisites and the SSH setup walk-through are in [Prerequisites](#prereq
 - **Passwordless sudo** on the target (Azure/cloud VMs default), or a sudo password passed via `--ask-become-pass` or [Ansible Vault](#ansible-vault).
 - **Basic comfort** with the Linux shell and YAML.
 
-> Tested with: Ansible 2.14+, Ubuntu 22.04, k3s v1.x, kubeadm/Kubernetes v1.30, k9s latest.
+> Tested with: Ansible 2.14+, Ubuntu 22.04, k3s v1.x, kubeadm/Kubernetes v1.30, k9s latest, Helm latest.
 
 ## Architecture Overview
 
@@ -185,7 +185,7 @@ ansible/
     └── roles/                  # reusable logic
         ├── k3s/                # lightweight single-node Kubernetes
         ├── kubeadm/            # upstream Kubernetes (containerd + flannel)
-        └── kube_tools/         # k9s terminal UI
+        └── kube_tools/         # k9s terminal UI + Helm
 ```
 
 > Start in `inventory/azure.ini` (set your VM), then run a playbook from `playbooks/`.
@@ -1275,7 +1275,7 @@ sudo systemctl status k3s     # confirm the service is running
 
 ---
 
-### kube_tools Role (k9s)
+### kube_tools Role (k9s, Helm)
 
 **[roles/kube_tools/defaults/main.yml](ansible/playbooks/roles/kube_tools/defaults/main.yml)**
 
@@ -1299,12 +1299,19 @@ k9s_url: >-
     if k9s_version == 'latest'
     else 'https://github.com/derailed/k9s/releases/download/' ~ k9s_version ~ '/k9s_Linux_amd64.tar.gz'
   }}
+
+# Helm version: latest looks up the newest release via the GitHub API, or pin one like v4.3.1
+helm_version: latest
+
+# binary install location
+helm_bin_dir: /usr/local/bin
 ```
 
 - `kube_tools_state` → same present/absent dispatch pattern as the k3s role (see [Ansible Roles](#ansible-roles))
 - `k9s_version` → `latest` always grabs the newest release; pinning a version (e.g. `v0.32.5`) keeps installs reproducible
 - `k9s_bin_dir` → where the k9s binary gets installed, defaults to `/usr/local/bin` like k3s
 - `k9s_url` → a Jinja2 conditional that builds the download URL from `k9s_version` — `latest` and a pinned version use different GitHub Releases paths
+- `helm_version` / `helm_bin_dir` → same idea for Helm; there's no `helm_url` because the `latest` tag has to be looked up at runtime (see the install tasks below)
 
 **[roles/kube_tools/tasks/main.yml](ansible/playbooks/roles/kube_tools/tasks/main.yml)**
 
@@ -1357,12 +1364,56 @@ k9s_url: >-
 - name: Print the k9s version
   ansible.builtin.debug:
     msg: "{{ k9s_check.stdout_lines }}"
+
+- name: Look up the latest Helm release
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/helm/helm/releases/latest
+    return_content: true
+  register: helm_latest
+  when: helm_version == 'latest' # get.helm.sh has no /latest URL, so ask GitHub for the newest tag
+
+- name: Download Helm
+  ansible.builtin.get_url:
+    url: "https://get.helm.sh/helm-{{ helm_latest.json.tag_name if helm_version == 'latest' else helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp/helm.tar.gz
+    mode: "0644"
+    timeout: 120
+  register: helm_download
+  retries: 3
+  delay: 5
+  until: helm_download is succeeded
+
+- name: Extract Helm
+  ansible.builtin.unarchive:
+    src: /tmp/helm.tar.gz
+    dest: /tmp/
+    remote_src: true
+
+- name: Install the Helm binary
+  become: true # only writing to /usr/local/bin needs root
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm # the tarball unpacks into linux-amd64/
+    dest: "{{ helm_bin_dir }}/helm"
+    mode: "0755"
+    remote_src: true
+
+- name: Check the Helm version
+  ansible.builtin.command: helm version
+  register: helm_check
+  changed_when: false
+
+- name: Print the Helm version
+  ansible.builtin.debug:
+    msg: "{{ helm_check.stdout_lines }}"
 ```
 
 - `retries` / `delay` / `until` → retries the download up to 3 times, 5 seconds apart, to handle network blips
 - `unarchive` → k9s releases ship as a `.tar.gz`; extract to `/tmp/` and pull the binary out
 - `become: true` only on the task that installs the k9s binary → task-level become (see [become](#become)): downloading and extracting happen in `/tmp`, only writing to `/usr/local/bin` needs root, so the whole play doesn't need `become: true`
 - `changed_when: false` → just a version check, never reports `changed`
+- Helm follows the same download → extract → install → check flow, with two differences:
+  - **Version lookup**: Helm binaries live on `get.helm.sh`, which has no `/latest` URL like GitHub Releases does. So when `helm_version` is `latest`, the `uri` task asks the GitHub API for the newest release and the download URL uses its `tag_name`; a pinned version skips that task (`when`) and goes straight into the URL
+  - **Tarball layout**: the archive unpacks into a `linux-amd64/` directory, so the binary is copied from `/tmp/linux-amd64/helm` rather than `/tmp/helm`
 
 #### Uninstall — [tasks/uninstall.yml](ansible/playbooks/roles/kube_tools/tasks/uninstall.yml)
 
@@ -1382,9 +1433,24 @@ k9s_url: >-
 - name: Print the uninstall result
   ansible.builtin.debug:
     msg: "{{ 'k9s uninstalled successfully' if not k9s_binary.stat.exists else 'k9s is still present, uninstall failed' }}"
+
+- name: Remove the Helm binary
+  become: true
+  ansible.builtin.file:
+    path: "{{ helm_bin_dir }}/helm"
+    state: absent
+
+- name: Confirm the Helm binary is removed
+  ansible.builtin.stat:
+    path: "{{ helm_bin_dir }}/helm"
+  register: helm_binary
+
+- name: Print the Helm uninstall result
+  ansible.builtin.debug:
+    msg: "{{ 'Helm uninstalled successfully' if not helm_binary.stat.exists else 'Helm is still present, uninstall failed' }}"
 ```
 
-- k9s is just a standalone binary — no systemd service, config file, or data directory — so removing it is a single `file: state: absent`; the closing `stat` + `debug` confirms it's gone, mirroring the k3s uninstall
+- k9s and Helm are both standalone binaries — no systemd service, config file, or data directory — so removing each is a single `file: state: absent`; the closing `stat` + `debug` confirms it's gone, mirroring the k3s uninstall
 
 #### Run
 
@@ -1412,7 +1478,7 @@ ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/install_kube_t
 ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kube_tools.yml
 ```
 
-- Unlike the k3s play, there's **no play-level `become: true`** here — only the task that writes `/usr/local/bin/k9s` declares its own `become: true`; everything else runs as the normal user
+- Unlike the k3s play, there's **no play-level `become: true`** here — only the tasks that write `/usr/local/bin/k9s` and `/usr/local/bin/helm` declare their own `become: true`; everything else runs as the normal user
 - `hosts: control` → installs on the control node by default, so you can SSH in and use k9s to inspect the cluster; to run it locally against a remote cluster instead, change to `hosts: local` with a local inventory
 
 #### Verify
@@ -1420,6 +1486,8 @@ ansible-playbook -i ansible/inventory/azure.ini ansible/playbooks/uninstall_kube
 ```bash
 k9s version           # check version
 k9s                   # launch the TUI, reads ~/.kube/config (the copy made by the k3s role)
+helm version          # check Helm version
+helm list -A          # list releases in all namespaces, also reads ~/.kube/config
 ```
 
 Once inside, you'll see nodes, pods, and other resources; press `:q` or `Ctrl-C` to exit.
@@ -1867,7 +1935,7 @@ Both roles give you a single-node Kubernetes control plane on the same VM. Pick 
 
 - **Just want a working cluster to run k9s against?** Use **k3s**.
 - **Want to understand kubelet, containerd, CNI, and `kubeadm init`?** Use **kubeadm**.
-- **`kube_tools` (k9s) works with either** — it just reads `~/.kube/config`, which both roles set up.
+- **`kube_tools` (k9s, Helm) works with either** — both tools just read `~/.kube/config`, which both roles set up.
 
 > Don't install both on the same node — they fight over ports and the container runtime. Uninstall one before installing the other.
 
@@ -1901,7 +1969,7 @@ Three files drive the lifecycle:
 | ---- | ------- |
 | [`molecule.yml`](ansible/playbooks/roles/kube_tools/molecule/default/molecule.yml) | Docker driver + Ubuntu 22.04 platform (`geerlingguy/docker-ubuntu2204-ansible`) |
 | [`converge.yml`](ansible/playbooks/roles/kube_tools/molecule/default/converge.yml) | Runs the `kube_tools` role against the container |
-| [`verify.yml`](ansible/playbooks/roles/kube_tools/molecule/default/verify.yml) | Asserts k9s binary exists at `/usr/local/bin/k9s` and is executable |
+| [`verify.yml`](ansible/playbooks/roles/kube_tools/molecule/default/verify.yml) | Asserts the k9s and Helm binaries exist in `/usr/local/bin` and are executable |
 
 ### Run
 
@@ -2026,7 +2094,7 @@ Look at the `PLAY RECAP` — a second run should report `changed=0`. Any task st
 ## Next Steps
 
 - **Add a worker node**: populate the `[node]` group in the inventory and extend the roles to join workers.
-- **Pin versions**: set `k9s_version` / kubeadm Kubernetes version for reproducible builds.
+- **Pin versions**: set `k9s_version` / `helm_version` / kubeadm Kubernetes version for reproducible builds.
 - **Deploy a workload**: `kubectl create deployment web --image=nginx` and explore it in `k9s`.
 - **Go multi-host**: point the inventory at several VMs and run the same playbook unchanged.
 - **Add molecule tests**: only `kube_tools` has a test suite today — `k3s` and `kubeadm` are good candidates to cover next.

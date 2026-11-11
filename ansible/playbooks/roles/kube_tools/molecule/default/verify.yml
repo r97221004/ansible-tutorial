@@ -28,3 +28,25 @@
     - name: Print k9s version
       ansible.builtin.debug:
         msg: "{{ k9s_version_output.stdout_lines }}"
+
+    - name: Check helm binary exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/helm
+      register: helm_bin
+
+    - name: Assert helm is installed and executable
+      ansible.builtin.assert:
+        that:
+          - helm_bin.stat.exists
+          - helm_bin.stat.executable
+        fail_msg: "helm binary missing or not executable at /usr/local/bin/helm"
+        success_msg: "helm binary is present and executable"
+
+    - name: Run helm version
+      ansible.builtin.command: /usr/local/bin/helm version
+      changed_when: false
+      register: helm_version_output
+
+    - name: Print helm version
+      ansible.builtin.debug:
+        msg: "{{ helm_version_output.stdout_lines }}"

@@ -3,7 +3,7 @@ galaxy_info:
   role_name: kube_tools
   namespace: matt2_chang
   author: Matt2_Chang
-  description: Install / uninstall cluster operation tools (k9s)
+  description: Install / uninstall cluster operation tools (k9s, Helm)
   license: MIT
   min_ansible_version: "2.14"
 dependencies: []

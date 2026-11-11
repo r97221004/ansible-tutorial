@@ -32,3 +32,44 @@
 - name: Print the k9s version
   ansible.builtin.debug:
     msg: "{{ k9s_check.stdout_lines }}"
+
+- name: Look up the latest Helm release
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/helm/helm/releases/latest
+    return_content: true
+  register: helm_latest
+  when: helm_version == 'latest' # get.helm.sh has no /latest URL, so ask GitHub for the newest tag
+
+- name: Download Helm
+  ansible.builtin.get_url:
+    url: "https://get.helm.sh/helm-{{ helm_latest.json.tag_name if helm_version == 'latest' else helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp/helm.tar.gz
+    mode: "0644"
+    timeout: 120
+  register: helm_download
+  retries: 3
+  delay: 5
+  until: helm_download is succeeded
+
+- name: Extract Helm
+  ansible.builtin.unarchive:
+    src: /tmp/helm.tar.gz
+    dest: /tmp/
+    remote_src: true
+
+- name: Install the Helm binary
+  become: true # only writing to /usr/local/bin needs root
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm # the tarball unpacks into linux-amd64/
+    dest: "{{ helm_bin_dir }}/helm"
+    mode: "0755"
+    remote_src: true
+
+- name: Check the Helm version
+  ansible.builtin.command: helm version
+  register: helm_check
+  changed_when: false
+
+- name: Print the Helm version
+  ansible.builtin.debug:
+    msg: "{{ helm_check.stdout_lines }}"
