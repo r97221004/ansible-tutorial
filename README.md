@@ -1998,8 +1998,8 @@ argocd_bin_dir: /usr/local/bin
 - name: Install the Argo CD CLI matching the server version
   become: true # only writing to /usr/local/bin needs root
   ansible.builtin.get_url:
-    url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.appversion }}/argocd-linux-amd64"
-    checksum: "sha256:https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.appversion }}/cli_checksums.txt"
+    url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.app_version }}/argocd-linux-amd64"
+    checksum: "sha256:https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.app_version }}/cli_checksums.txt"
     dest: "{{ argocd_bin_dir }}/argocd"
     mode: "0755"
     timeout: 120
@@ -2027,7 +2027,7 @@ argocd_bin_dir: /usr/local/bin
 - `kubernetes.core.helm` instead of `command: helm install` → the module checks the current release first and only installs/upgrades when needed, so it's idempotent without a hand-written `changed_when:`
 - `helm_repository` + `chart_ref: argo/argo-cd` → registering the repo first is the module's recommended way; passing `chart_repo_url` directly can miss changes (see the module notes)
 - `create_namespace` / `wait` → creates the `argocd` namespace if needed, and the task only finishes once every Argo CD pod is Ready
-- `argocd_release.status.appversion` → the `helm` module returns the deployed app version (e.g. `v3.6.1`), which is reused to download the **matching** CLI
+- `argocd_release.status.app_version` → the `helm` module returns the deployed app version (e.g. `v3.6.1`), which is reused to download the **matching** CLI
 - `checksum: sha256:<url>` → `get_url` fetches the release's `cli_checksums.txt`, finds the line for `argocd-linux-amd64` and verifies the download. It also makes re-runs skip the download when the installed file already matches
 - The CLI is a single binary, not a tarball, so `get_url` writes it straight into `/usr/local/bin` — no extract/copy steps like k9s and Helm
 - Only that task has `become: true`; the Helm tasks run as the normal user so they use **their** `~/.kube/config`

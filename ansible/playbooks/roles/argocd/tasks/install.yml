@@ -18,8 +18,8 @@
 - name: Install the Argo CD CLI matching the server version
   become: true # only writing to /usr/local/bin needs root
   ansible.builtin.get_url:
-    url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.appversion }}/argocd-linux-amd64"
-    checksum: "sha256:https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.appversion }}/cli_checksums.txt"
+    url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.app_version }}/argocd-linux-amd64"
+    checksum: "sha256:https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.app_version }}/cli_checksums.txt"
     dest: "{{ argocd_bin_dir }}/argocd"
     mode: "0755"
     timeout: 120
