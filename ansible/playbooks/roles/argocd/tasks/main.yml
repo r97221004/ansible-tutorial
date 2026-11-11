@@ -1,0 +1,9 @@
+---
+# Dispatch to install or uninstall based on argocd_state
+- name: Install Argo CD
+  ansible.builtin.include_tasks: install.yml
+  when: argocd_state == "present"
+
+- name: Uninstall Argo CD
+  ansible.builtin.include_tasks: uninstall.yml
+  when: argocd_state == "absent"

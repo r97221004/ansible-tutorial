@@ -1,0 +1,15 @@
+---
+# Default variables for the argocd role; override in inventory or the playbook
+
+# present = install, absent = uninstall
+argocd_state: present
+
+# namespace Argo CD is installed into
+argocd_namespace: argocd
+
+# argo-cd Helm chart version, pinned so cluster installs are reproducible
+# The CLI version follows the chart's appVersion, so CLI and server always match
+argocd_chart_version: 10.17.2
+
+# binary install location for the argocd CLI
+argocd_bin_dir: /usr/local/bin

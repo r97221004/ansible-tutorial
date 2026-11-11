@@ -1,0 +1,9 @@
+---
+# Install Argo CD (Helm chart) and its matching CLI on the control group
+# Needs a running cluster (install_k3s.yml or install_kubeadm.yml) and Helm (install_kube_tools.yml),
+# plus the kubernetes.core collection: ansible-galaxy collection install -r requirements.yml
+# Usage: ansible-playbook playbooks/install_argocd.yml
+- name: Install Argo CD
+  hosts: control
+  roles:
+    - argocd

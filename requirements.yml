@@ -1,0 +1,6 @@
+---
+# Ansible collections used by the playbooks
+# Install: ansible-galaxy collection install -r requirements.yml
+collections:
+  - name: kubernetes.core # helm / helm_repository modules (argocd role); 6.4.0+ supports Helm v4
+    version: ">=6.4.0,<7.0.0"

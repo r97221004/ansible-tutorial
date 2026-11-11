@@ -1,0 +1,8 @@
+---
+# Uninstall Argo CD and its CLI (the chart keeps its CRDs; see README to remove them)
+# Usage: ansible-playbook playbooks/uninstall_argocd.yml
+- name: Uninstall Argo CD
+  hosts: control
+  roles:
+    - role: argocd
+      argocd_state: absent

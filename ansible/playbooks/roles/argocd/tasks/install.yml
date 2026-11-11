@@ -1,0 +1,44 @@
+---
+- name: Add the Argo CD Helm repository
+  kubernetes.core.helm_repository:
+    name: argo
+    repo_url: https://argoproj.github.io/argo-helm
+
+- name: Install the Argo CD chart
+  kubernetes.core.helm:
+    name: argocd
+    chart_ref: argo/argo-cd
+    chart_version: "{{ argocd_chart_version }}"
+    release_namespace: "{{ argocd_namespace }}"
+    create_namespace: true
+    update_repo_cache: true # so a newly pinned chart version can be found
+    wait: true # don't finish until every Argo CD pod is ready
+  register: argocd_release
+
+- name: Install the Argo CD CLI matching the server version
+  become: true # only writing to /usr/local/bin needs root
+  ansible.builtin.get_url:
+    url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.appversion }}/argocd-linux-amd64"
+    checksum: "sha256:https://github.com/argoproj/argo-cd/releases/download/{{ argocd_release.status.appversion }}/cli_checksums.txt"
+    dest: "{{ argocd_bin_dir }}/argocd"
+    mode: "0755"
+    timeout: 120
+  register: argocd_cli_download
+  retries: 3
+  delay: 5
+  until: argocd_cli_download is succeeded
+
+- name: Check the Argo CD CLI version
+  ansible.builtin.command: argocd version --client # without --client it tries to reach the server
+  register: argocd_check
+  changed_when: false
+
+- name: Print the Argo CD CLI version
+  ansible.builtin.debug:
+    msg: "{{ argocd_check.stdout_lines }}"
+
+- name: Print how to log in
+  ansible.builtin.debug:
+    msg:
+      - "Admin password: kubectl -n {{ argocd_namespace }} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+      - "UI / API:       kubectl -n {{ argocd_namespace }} port-forward svc/argocd-server 8080:443"

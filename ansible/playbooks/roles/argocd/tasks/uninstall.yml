@@ -1,0 +1,28 @@
+---
+- name: Uninstall the Argo CD chart
+  kubernetes.core.helm:
+    name: argocd
+    release_namespace: "{{ argocd_namespace }}"
+    release_state: absent
+    wait: true
+
+- name: Delete the Argo CD namespace
+  # k3s's bundled kubectl ignores ~/.kube/config and reads root-only /etc/rancher/k3s/k3s.yaml, so point at it explicitly
+  ansible.builtin.command: kubectl --kubeconfig {{ ansible_env.HOME }}/.kube/config delete namespace {{ argocd_namespace }} --ignore-not-found
+  register: argocd_namespace_delete
+  changed_when: "'deleted' in argocd_namespace_delete.stdout"
+
+- name: Remove the Argo CD CLI
+  become: true
+  ansible.builtin.file:
+    path: "{{ argocd_bin_dir }}/argocd"
+    state: absent
+
+- name: Confirm the Argo CD CLI is removed
+  ansible.builtin.stat:
+    path: "{{ argocd_bin_dir }}/argocd"
+  register: argocd_binary
+
+- name: Print the uninstall result
+  ansible.builtin.debug:
+    msg: "{{ 'Argo CD uninstalled successfully' if not argocd_binary.stat.exists else 'argocd CLI is still present, uninstall failed' }}"
